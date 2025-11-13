@@ -1,0 +1,24 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adaptive Landing Page</title>
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+
+<body data-session-id="{{ session_id }}">
+  <div id="page-root"></div>
+
+  <!-- Embed JSON recommendations -->
+  <script id="page-config" type="application/json">
+    {{ recommendations_json|safe }}
+  </script>
+
+  <script src="{% static 'js/event_tracker.js' %}"></script>
+  <script src="{% static 'js/page_builder.js' %}"></script>
+</body>
+
+</html>
