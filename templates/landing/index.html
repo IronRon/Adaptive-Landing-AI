@@ -1,0 +1,84 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ShinePro Car Wash</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  </head>
+  <body>
+    <header class="hero">
+      <div class="container">
+        <nav class="nav">
+          <div class="brand">ShinePro</div>
+          <ul class="nav-links">
+            <li><a href="#services">Services</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#contact">Contact</a></li>
+          </ul>
+        </nav>
+
+        <div class="hero-content">
+          <h1>Fast. Clean. Reliable.</h1>
+          <p>Premium car wash and detailing that brings back the showroom shine — quick, eco-friendly, and affordable.</p>
+          <a class="btn primary" href="#booking">Book Now</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="services" class="cards">
+        <article class="card">
+          <h3>Express Wash</h3>
+          <p>Exterior wash and quick dry — perfect for busy schedules.</p>
+        </article>
+        <article class="card">
+          <h3>Deluxe Detail</h3>
+          <p>Complete interior and exterior deep clean with polish.</p>
+        </article>
+        <article class="card">
+          <h3>Eco-Friendly</h3>
+          <p>Water-efficient washes using biodegradable products.</p>
+        </article>
+      </section>
+
+      <section id="pricing" class="pricing">
+        <h2>Pricing</h2>
+        <div class="price-grid">
+          <div class="price">
+            <h4>Express</h4>
+            <p class="amount">$10</p>
+            <p>Exterior wash</p>
+          </div>
+          <div class="price">
+            <h4>Standard</h4>
+            <p class="amount">$25</p>
+            <p>Wash + Interior vacuum</p>
+          </div>
+          <div class="price">
+            <h4>Detail</h4>
+            <p class="amount">$75</p>
+            <p>Full detail & polish</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="booking" class="cta">
+        <h2>Ready for a clean ride?</h2>
+        <p>Schedule online or call us and get 10% off your first service.</p>
+        <a class="btn secondary" href="#contact">Get Started</a>
+      </section>
+
+      <section id="contact" class="contact">
+        <h2>Contact</h2>
+        <p>Email: hello@shinepro.example | Phone: (555) 123-4567</p>
+        <p>Location: 123 Clean St, Auto City</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">&copy; {{ now|date:"Y" }} ShinePro Car Wash — All rights reserved.</div>
+    </footer>
+  </body>
+</html>
