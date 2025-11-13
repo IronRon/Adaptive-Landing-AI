@@ -25,8 +25,16 @@ def generate_demo_recommendations(visitor):
     sessions = visitor.sessions.order_by('-started_at')
     session_count = sessions.count()
 
-    # Default layout order
-    default_layout = ["header", "services", "pricing", "cta"]
+    # Default layout order (expanded to include newer sections)
+    default_layout = [
+        "header",
+        "features",
+        "services",
+        "pricing",
+        "testimonials",
+        "cta",
+        "contact",
+    ]
     layout = default_layout.copy()
     customizations = {
         "header": {"text": "Fast. Clean. Reliable.", "style": "default"},

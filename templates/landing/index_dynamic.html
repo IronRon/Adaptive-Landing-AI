@@ -10,6 +10,17 @@
 </head>
 
 <body data-session-id="{{ session_id }}">
+  <nav class="nav container">
+    <div class="brand">ShinePro Car Wash</div>
+    <ul class="nav-links">
+      <li><a href="#services">Services</a></li>
+      <li><a href="#pricing">Pricing</a></li>
+      <li><a href="#testimonials">Reviews</a></li>
+      <li><a href="#contact">Contact</a></li>
+      <li><a class="btn primary" href="#booking">Book Now</a></li>
+    </ul>
+  </nav>
+
   <div id="page-root"></div>
 
   <!-- Embed JSON recommendations -->
@@ -19,6 +30,11 @@
 
   <script src="{% static 'js/event_tracker.js' %}"></script>
   <script src="{% static 'js/page_builder.js' %}"></script>
+  <footer class="container footer">
+    <div>
+      &copy; ShinePro Car Wash — Call: <a href="tel:1234567890">123-456-7890</a> — Email: <a href="mailto:info@shinepro.example">info@shinepro.example</a>
+    </div>
+  </footer>
 </body>
 
 </html>
