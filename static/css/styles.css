@@ -1,0 +1,347 @@
+/* Basic styles for ShinePro Car Wash landing page */
+:root {
+    --primary: #0077cc;
+    --accent: #ffcc00;
+    --bg: #f7f9fb;
+    --text: #222;
+    --muted: #666;
+    --container: 1100px;
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+    margin: 0;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.5
+}
+
+.container {
+    max-width: var(--container);
+    margin: 0 auto;
+    padding: 1rem
+}
+
+.nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0
+}
+
+.brand {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--primary)
+}
+
+.nav-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 1rem
+}
+
+.nav-links a {
+    color: var(--text);
+    text-decoration: none
+}
+
+.hero {
+    background: linear-gradient(180deg, rgba(0, 119, 204, 0.08), transparent);
+    padding: 3.5rem 0
+}
+
+.hero-image img {
+    max-width: 420px;
+    width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(12, 20, 30, 0.12);
+}
+
+.hero-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem
+}
+
+.btn {
+    transition: transform .12s ease, box-shadow .12s ease
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08)
+}
+
+.features {
+    padding: 2rem 0
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem
+}
+
+.feature {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(10, 20, 30, 0.05)
+}
+
+.testimonials {
+    padding: 2rem 0
+}
+
+.testimonial {
+    background: linear-gradient(90deg, #fff, #fff9);
+    padding: 1rem 1.25rem;
+    border-left: 4px solid var(--primary);
+    margin-bottom: 0.75rem;
+    border-radius: 8px
+}
+
+.contact .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1rem
+}
+
+.contact-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem
+}
+
+.contact-form label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.95rem
+}
+
+.contact-form input,
+.contact-form textarea {
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid #e6e9ee
+}
+
+/* Nav links layout */
+.nav .nav-links {
+    align-items: center
+}
+
+.nav .nav-links li {
+    list-style: none
+}
+
+.nav .nav-links a {
+    padding: 0.25rem 0.5rem
+}
+
+/* Footer tweaks */
+.footer a {
+    color: var(--primary);
+    text-decoration: none
+}
+
+.hero-content {
+    padding: 2rem 0
+}
+
+.hero h1 {
+    font-size: 2rem;
+    margin: 0 0 .5rem
+}
+
+.hero p {
+    color: var(--muted);
+    margin: 0 0 1rem
+}
+
+.btn {
+    display: inline-block;
+    padding: .65rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600
+}
+
+.btn.primary {
+    background: var(--primary);
+    color: #fff
+}
+
+.btn.secondary {
+    background: #fff;
+    border: 2px solid var(--primary);
+    color: var(--primary)
+}
+
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    background: #fff;
+    padding: 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(12, 20, 30, 0.06)
+}
+
+/* Card hover effect */
+.card {
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+.card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 40px rgba(12,20,30,0.13);
+}
+
+
+.card h3 {
+    margin: 0 0 .5rem
+}
+
+
+.price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem
+}
+
+.price {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(12, 20, 30, 0.04)
+}
+
+/* Price card hover + layout */
+.price {
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.price:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 50px rgba(12,20,30,0.14);
+}
+.price h4 { margin: 0 }
+.price .price-features { list-style: none; padding: 0; margin: .6rem 0; color: var(--muted); font-size: .95rem }
+.price .price-features li { margin: 0.25rem 0 }
+.price .price-actions { display:flex; gap:0.5rem; margin-top: .75rem }
+.price .btn { padding: .5rem .85rem }
+
+/* Button hover tweaks */
+.btn.primary:hover { background: #005ea6 }
+.btn.secondary:hover { background: #f3fbff }
+
+.price .amount {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin: .5rem 0
+}
+
+.cta {
+    background: linear-gradient(90deg, rgba(0, 119, 204, 0.06), rgba(255, 204, 0, 0.03));
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    margin: 2rem 0
+}
+
+.contact {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(12, 20, 30, 0.04);
+    margin-bottom: 2rem
+}
+
+.footer {
+    padding: 1rem 0;
+    color: var(--muted);
+    font-size: .9rem
+}
+
+@media(min-width:900px) {
+    .hero-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between
+    }
+
+    .hero h1 {
+        font-size: 2.6rem
+    }
+}
+
+/* Small utilities */
+.muted {
+    color: var(--muted)
+}
+
+.hero.highlight h1 {
+    color: #fbbf24;
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+
+.pricing.highlight {
+    border: 2px solid gold;
+    background-color: #fffbea;
+}
+
+/* Highlighted services section (cards) */
+.cards.highlight {
+    border: 2px solid var(--accent);
+    background-color: #fffbea;
+}
+
+/* Highlighted CTA */
+.cta.highlight {
+    border: 2px solid var(--accent);
+    box-shadow: 0 8px 24px rgba(251, 191, 36, 0.15);
+    background: linear-gradient(90deg, rgba(255, 236, 179, 0.4), rgba(255, 255, 255, 0.02));
+}
+
+/* Debug panel shown in development to surface recommendation decisions */
+.debug-panel {
+    position: fixed;
+    right: 12px;
+    top: 12px;
+    width: 280px;
+    max-height: 60vh;
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    z-index: 9999;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.debug-panel pre {
+    white-space: pre-wrap;
+    color: #fff;
+    font-size: 11px
+}
+
+.debug-panel strong {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700
+}
