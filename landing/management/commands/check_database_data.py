@@ -3,7 +3,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 import json
 
-from landing.models import Visitor, Session, Interaction
+from landing.models import Visitor, Session, Interaction, BanditArm
 
 
 class Command(BaseCommand):
@@ -43,6 +43,8 @@ class Command(BaseCommand):
         visitors = list(apply_limit(visitors_qs).values())
         sessions = list(apply_limit(sessions_qs).values())
         interactions = list(apply_limit(interactions_qs).values())
+        bandit_arms_qs = BanditArm.objects.all().order_by('section')
+        bandit_arms = list(apply_limit(bandit_arms_qs).values())
 
         summary = {
             'generated_at': timezone.now(),
@@ -55,6 +57,7 @@ class Command(BaseCommand):
                 'visitors': visitors,
                 'sessions': sessions,
                 'interactions': interactions,
+                'bandit_arms': bandit_arms,
             }
         }
 
@@ -71,6 +74,9 @@ class Command(BaseCommand):
         for k, v in summary['counts'].items():
             self.stdout.write(f'  - {k}: {v}')
 
+        # Print bandit arm count
+        self.stdout.write(f'  - bandit_arms: {BanditArm.objects.count()}')
+
         def print_rows(title, rows, fields=None, sample_limit=limit):
             self.stdout.write(f"\n{title} (showing {len(rows)}):")
             if not rows:
@@ -86,5 +92,6 @@ class Command(BaseCommand):
         print_rows('Visitors', visitors, fields=['id', 'cookie_id', 'created_at', 'last_seen'])
         print_rows('Sessions', sessions, fields=['id', 'visitor_id', 'session_id', 'started_at', 'ended_at', 'is_active'])
         print_rows('Interactions', interactions, fields=['id', 'session_id', 'event_type', 'element', 'timestamp', 'x', 'y'])
+        print_rows('Bandit arms', bandit_arms, fields=['id', 'section', 'pulls', 'reward'])
 
         self.stdout.write('\nDone.')

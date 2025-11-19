@@ -1,18 +1,13 @@
 from django.shortcuts import render
-from .models import Visitor, Session
 from django.utils import timezone
 import json
 from django.http import JsonResponse
-from .models import Session, Interaction
 from django.views.decorators.csrf import csrf_exempt
 from collections import Counter
-import json
 import uuid
-from django.shortcuts import render
-from django.utils import timezone
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from .models import Visitor, Session, Interaction
+from .bandit import SectionBandit
+from .utils import get_user_section_scores, combine_scores
 
 def generate_demo_recommendations(visitor):
     """Generate layout and customizations based on last session's clicks.
@@ -84,6 +79,59 @@ def generate_demo_recommendations(visitor):
 
     return {"layout": layout, "customizations": customizations, "debug": debug}
 
+def generate_recommendations(visitor):
+    # 1. Load valid sections (arms)
+    config = json.load(open("landing/bandit_config.json"))
+    default_layout = config["arms"]
+
+    # 2. Global scores from bandit
+    bandit = SectionBandit()
+    global_scores = bandit.get_global_scores()
+
+    # 3. Personal scores
+    user_scores = get_user_section_scores(visitor)
+
+    # 4. Combine them (expose weights in debug)
+    w_global = 0.7
+    w_user = 0.3
+    scores = combine_scores(global_scores, user_scores, w_global=w_global, w_user=w_user)
+
+    # 5. Order sections by score
+    ordered_sections = sorted(default_layout, key=lambda s: -scores.get(s, 0))
+
+    # 6. Build customizations (simple for now)
+    customizations = {
+        "header": {
+            "text": "Welcome back!" if visitor.sessions.count() > 1 else
+                    "Fast. Clean. Reliable.",
+            "style": "highlight" if visitor.sessions.count() > 1 else "default",
+        }
+    }
+
+    # Debug info: clicks & sessions considered (limit to 20 ids for readability)
+    sessions = visitor.sessions.order_by('-started_at')
+    session_count = sessions.count()
+    interactions = Interaction.objects.filter(session__in=sessions, event_type="click")
+    section_clicks = Counter(i.element for i in interactions if i.element)
+
+    sessions_considered = [str(s.session_id) for s in (sessions[:20] if hasattr(sessions, '__iter__') else sessions)]
+    debug = {
+        'used_default': not bool(section_clicks),
+        'section_clicks': dict(section_clicks),
+        'sessions_considered': sessions_considered,
+        'session_count_considered': session_count,
+        'weights': {'w_global': w_global, 'w_user': w_user},
+        'default_layout': default_layout,
+    }
+
+    return {
+        "layout": ordered_sections,
+        "scores": scores,
+        "global_scores": global_scores,
+        "user_scores": user_scores,
+        "customizations": customizations,
+        "debug": debug,
+    }
 
 def landing_page(request):
     cookie_id = request.COOKIES.get("visitor_id")
@@ -105,7 +153,7 @@ def landing_page(request):
     )
 
     # Generate layout recommendations
-    recommendations = generate_demo_recommendations(visitor)
+    recommendations = generate_recommendations(visitor)
 
     response = render(
         request,

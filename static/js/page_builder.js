@@ -149,15 +149,31 @@ layout.forEach((key) => {
   try {
     const dbg = config.debug || null;
     if (!dbg) return;
+
     const panel = document.createElement('aside');
     panel.className = 'debug-panel';
-    const used = dbg.used_default ? 'YES (default used)' : 'NO (reordered)';
+
+    // Collect everything we want to show from the recommendations payload
+    const toRender = {
+      debug: dbg,
+      layout: config.layout || null,
+      scores: config.scores || null,
+      global_scores: config.global_scores || null,
+      user_scores: config.user_scores || null,
+      customizations: config.customizations || null,
+    };
+
     const lines = [];
-    lines.push(`<strong>Layout debug</strong>`);
-    lines.push(`<div>Used default: <em>${used}</em></div>`);
-    lines.push(`<div>Sessions considered: <em>${dbg.session_count_considered}</em></div>`);
-    lines.push(`<div>Session IDs: <pre>${JSON.stringify(dbg.sessions_considered || [], null, 2)}</pre></div>`);
-    lines.push(`<div>Section clicks: <pre>${JSON.stringify(dbg.section_clicks || {}, null, 2)}</pre></div>`);
+    lines.push(`<strong>Recommendations Debug</strong>`);
+    lines.push(`<div><em>Note:</em> all fields from server-side ` +
+               `recommendations are shown below.</div>`);
+    lines.push(`<div><h4>Debug object</h4><pre>${JSON.stringify(toRender.debug, null, 2)}</pre></div>`);
+    lines.push(`<div><h4>Layout (final)</h4><pre>${JSON.stringify(toRender.layout, null, 2)}</pre></div>`);
+    lines.push(`<div><h4>Scores (combined)</h4><pre>${JSON.stringify(toRender.scores, null, 2)}</pre></div>`);
+    lines.push(`<div><h4>Global scores (bandit)</h4><pre>${JSON.stringify(toRender.global_scores, null, 2)}</pre></div>`);
+    lines.push(`<div><h4>User scores (per-visitor)</h4><pre>${JSON.stringify(toRender.user_scores, null, 2)}</pre></div>`);
+    lines.push(`<div><h4>Customizations</h4><pre>${JSON.stringify(toRender.customizations, null, 2)}</pre></div>`);
+
     panel.innerHTML = lines.join('');
     document.body.appendChild(panel);
   } catch (e) {

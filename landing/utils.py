@@ -1,34 +1,34 @@
-from .models import Interaction
 from collections import Counter
+from .models import Interaction, Session
 
-def get_recommendations(visitor):
+def get_user_section_scores(visitor):
+    """Calculate section scores by aggregating clicks across all sessions.
+
+    This matches the behavior in `generate_demo_recommendations` which
+    considers all sessions when computing click counts for layout choices.
+    Returns a mapping section -> normalized score (0..1).
     """
-    Simple rule-based logic to emulate AI recommendations.
-    Looks at last session's interactions and returns JSON.
-    """
-    sessions = visitor.sessions.all().order_by('-started_at')
+    sessions = visitor.sessions.order_by('-started_at')
     if not sessions.exists():
-        return {"layout": [], "style_changes": {}, "messages": []}
+        return {}
 
-    latest = sessions.first()
-    interactions = Interaction.objects.filter(session=latest)
+    interactions = Interaction.objects.filter(session__in=sessions, event_type="click")
+    clicks = [i.element for i in interactions if i.element]
 
-    clicked = [i.element for i in interactions if i.event_type == "click"]
-    click_counts = Counter(clicked)
+    counter = Counter(clicks)
+    total = sum(counter.values()) or 1
 
-    rec = {"layout": [], "style_changes": {}, "messages": []}
+    # Normalize 0–1
+    return {section: count / total for section, count in counter.items()}
 
-    # Example rule 1: Move pricing higher if user clicked pricing section
-    if "H4" in click_counts or "PRICING" in str(clicked).upper():
-        rec["layout"].append({"move_section": "pricing", "position": "top"})
-        rec["messages"].append("Pricing moved up due to frequent interest.")
+def combine_scores(global_scores, user_scores, w_global=0.7, w_user=0.3):
+    combined = {}
 
-    # Example rule 2: Enlarge CTA if clicked
-    if "A" in click_counts or "BUTTON" in str(clicked).upper():
-        rec["style_changes"]["cta"] = {"scale": 1.3, "highlight": True}
-        rec["messages"].append("CTA emphasized for returning visitor.")
+    all_sections = set(global_scores) | set(user_scores)
 
-    # Example rule 3: Add welcome text if returning user
-    rec["messages"].append("Welcome back!")
+    for section in all_sections:
+        g = global_scores.get(section, 0)
+        u = user_scores.get(section, 0)
+        combined[section] = w_global * g + w_user * u
 
-    return rec
+    return combined

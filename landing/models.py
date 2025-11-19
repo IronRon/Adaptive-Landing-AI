@@ -34,3 +34,12 @@ class Interaction(models.Model):
 
     def __str__(self):
         return f"{self.event_type} - {self.element}"
+
+
+class BanditArm(models.Model):
+    section = models.CharField(max_length=50, unique=True)
+    pulls = models.IntegerField(default=0)    # number of times selected
+    reward = models.FloatField(default=0.0)   # cumulative reward
+
+    def __str__(self):
+        return f"{self.section}: pulls={self.pulls}, reward={self.reward}"
