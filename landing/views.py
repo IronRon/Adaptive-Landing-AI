@@ -108,6 +108,14 @@ def generate_recommendations(visitor):
         }
     }
 
+    # Optional: highlight the first section in the ordered list
+    if ordered_sections:
+        first_section = ordered_sections[0]
+        if first_section != 'header':
+            customizations.setdefault(first_section, {})
+            # mark it as highlighted while preserving existing customizations
+            customizations[first_section]['highlight'] = True
+
     # Debug info: clicks & sessions considered (limit to 20 ids for readability)
     sessions = visitor.sessions.order_by('-started_at')
     session_count = sessions.count()

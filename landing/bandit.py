@@ -17,6 +17,7 @@ class SectionBandit:
         # log term using (total_pulls + number_of_arms). This gives a finite
         # positive exploration score for arms with 0 pulls while preserving
         # the UCB-style tradeoff for arms with pulls > 0.
+        #  n_arms is added to avoid infinite values when all arms have 0 pulls
         n_arms = max(1, len(self.arms))
         base_log = math.log(max(1, total_pulls + n_arms))
 
