@@ -89,3 +89,14 @@
   }
 }
 
+2025-11-27T14:47:41.470095 - {
+  "layout": ["header","pricing","features","services","testimonials","cta","contact"],
+  "customizations": {
+    "pricing": {
+      "style": "background: #fffbea; border: 2px solid #ffcc00;",
+      "text": "Personalized pricing just for you"
+    }
+  },
+  "explanation": "Pricing has the strongest interaction signal (highest user_score and click_counts). Placed pricing directly after the header to surface it earlier. Added a soft highlight around pricing to draw attention without major layout changes; kept other sections in default order."
+}
+
