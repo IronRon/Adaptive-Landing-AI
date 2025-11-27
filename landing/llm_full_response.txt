@@ -1,0 +1,91 @@
+2025-11-26T18:47:50.828663 - {
+  "layout": ["header", "services", "pricing", "features", "testimonials", "cta", "contact"],
+  "customizations": {
+    "header": {"text": "Welcome back. Explore our tailored services for you.", "style": "bold; 32px; #1a1a1a"},
+    "services": {"highlight": true}
+  }
+}
+
+2025-11-26T18:55:38.991570 - {
+  "layout": ["header", "services", "features", "pricing", "testimonials", "cta", "contact"],
+  "customizations": {
+    "header": {
+      "text": "Welcome to Your Solution",
+      "style": "bold; large; high-contrast"
+    },
+    "services": {
+      "highlight": true
+    }
+  }
+}
+
+2025-11-26T18:56:47.863924 - {
+  "layout": ["header", "services", "pricing", "testimonials", "cta", "contact", "features"],
+  "customizations": {
+    "header": {
+      "text": "Welcome to RizePro — fast, clear value for your business",
+      "style": "hero-large, high-contrast, bold"
+    },
+    "services": {
+      "highlight": true,
+      "layout": "cards",
+      "colorTheme": "brand-accent"
+    },
+    "pricing": {
+      "highlightBestValue": true,
+      "currency": "USD"
+    }
+  }
+}
+
+2025-11-26T18:58:57.442816 - {
+  "layout": ["header","services","pricing","features","testimonials","cta","contact"],
+  "customizations": {
+    "header": {"text": "Welcome back! Discover what's new since your last visit.", "style": "bold, high-contrast, large"},
+    "services": {"highlight": true},
+    "pricing": {"layout": "monthly toggle", "highlightBestValue": true},
+    "testimonials": {"showVideo": false}
+  }
+}
+
+2025-11-26T19:01:51.496318 - {
+  "layout": ["header", "services", "pricing", "testimonials", "features", "cta", "contact"],
+  "customizations": {
+    "header": {
+      "text": "Reveal your growth with tailored solutions",
+      "style": "font-weight:700; font-size:48px; color:#1a1a1a; text-align:left"
+    },
+    "services": {
+      "highlight": true,
+      "layout": "grid",
+      "color": "#0a7a8e"
+    },
+    "pricing": {
+      "focus": "value-first pricing",
+      "style": "card-highlight"
+    },
+    "testimonials": {
+      "carousel": true
+    },
+    "cta": {
+      "text": "Start Free",
+      "style": "solid, primary, rounded"
+    },
+    "contact": {
+      "showForm": true
+    }
+  }
+}
+
+2025-11-27T00:31:30.617204 - {
+  "layout": ["header","services","pricing","features","testimonials","cta","contact"],
+  "customizations": {
+    "header": {"text": "Grow faster with tailored solutions", "style": "bold, high-contrast gradient; font-size: 48-60px; align-left"},
+    "services": {"highlight": true, "layout": "grid", "cards_config": {"columns": 3, "compact": false}},
+    "pricing": {"highlight": true, "currency": "USD", "billingInterval": "monthly", "badge": "Most Popular"},
+    "testimonials": {"carousel": true, "autoplay": true, "visibleSlides": 3},
+    "cta": {"text": "Get Started", "style": "primary; large; rounded"},
+    "contact": {"form": "inline", "fields": ["name","email","message"], "buttonText": "Send"}
+  }
+}
+

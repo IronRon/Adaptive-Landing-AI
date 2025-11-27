@@ -345,3 +345,44 @@ body {
     margin-bottom: 6px;
     font-weight: 700
 }
+
+.cookie-popup {
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    width: 100%;
+    max-width: 420px;
+    z-index: 10000;
+    display: flex;
+    justify-content: flex-end;
+    pointer-events: none; /* allow inner box to manage pointer events */
+}
+
+.cookie-box {
+    pointer-events: auto;
+    background: #fff;
+    padding: 16px;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(12,20,30,0.15);
+}
+
+.cookie-box h3 {
+    margin: 0 0 6px;
+    font-size: 1.05rem;
+}
+
+.cookie-box p {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: .95rem;
+}
+
+.cookie-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.cookie-actions .btn {
+    flex: 1;
+}

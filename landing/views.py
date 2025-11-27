@@ -8,76 +8,8 @@ import uuid
 from .models import Visitor, Session, Interaction
 from .bandit import SectionBandit
 from .utils import get_user_section_scores, combine_scores
-
-def generate_demo_recommendations(visitor):
-    """Generate layout and customizations based on last session's clicks.
-
-    This inspects the most recent session for the visitor, counts clicks per
-    section (Interaction.element should contain the section id like 'pricing'),
-    sorts sections by click frequency, and returns a layout plus simple
-    customizations (header text and optional highlight for the top section).
-    """
-    sessions = visitor.sessions.order_by('-started_at')
-    session_count = sessions.count()
-
-    # Default layout order (expanded to include newer sections)
-    default_layout = [
-        "header",
-        "features",
-        "services",
-        "pricing",
-        "testimonials",
-        "cta",
-        "contact",
-    ]
-    layout = default_layout.copy()
-    customizations = {
-        "header": {"text": "Fast. Clean. Reliable.", "style": "default"},
-    }
-
-    # If there are 1 or fewer sessions, keep the default layout (no reordering).
-    if session_count <= 1:
-        # debug info: which sessions would have been considered (none or one)
-        debug = {
-            'used_default': True,
-            'section_clicks': {},
-            'sessions_considered': [str(s.session_id) for s in sessions[:20]],
-            'session_count_considered': session_count,
-        }
-        return {"layout": layout, "customizations": customizations, "debug": debug}
-
-    # For visitors with more than one session, aggregate across all sessions
-    target_sessions = sessions
-
-    # Gather clicks per section across the chosen sessions
-    interactions = Interaction.objects.filter(session__in=target_sessions, event_type="click")
-    section_clicks = Counter(i.element for i in interactions if i.element)
-
-    if section_clicks:
-        # Sort layout by sections with highest click count first
-        sorted_sections = sorted(default_layout, key=lambda s: -section_clicks.get(s, 0))
-        layout = [sec for sec in sorted_sections if sec in default_layout]
-
-        # Optional: highlight the most clicked section
-        top_section, _ = section_clicks.most_common(1)[0]
-        if top_section in default_layout and top_section != 'header':
-            customizations[top_section] = {"highlight": True}
-
-        # Adjust header message if multiple visits
-        if visitor.sessions.count() > 1:
-            customizations["header"] = {"text": "Welcome back!", "style": "highlight"}
-
-    # Debug info to help surface why layout was chosen
-    # list the session ids we considered (limits to 20 ids for readability)
-    sessions_considered = [str(s.session_id) for s in (target_sessions[:20] if hasattr(target_sessions, '__iter__') else target_sessions)]
-    debug = {
-        'used_default': not bool(section_clicks),
-        'section_clicks': dict(section_clicks),
-        'sessions_considered': sessions_considered,
-        'session_count_considered': session_count,
-    }
-
-    return {"layout": layout, "customizations": customizations, "debug": debug}
+from .ai_llm import generate_llm_recommendations
+from django.core.exceptions import ValidationError
 
 def generate_recommendations(visitor):
     # 1. Load valid sections (arms)
@@ -91,64 +23,64 @@ def generate_recommendations(visitor):
     # 3. Personal scores
     user_scores = get_user_section_scores(visitor)
 
-    # 4. Combine them (expose weights in debug)
-    w_global = 0.7
-    w_user = 0.3
-    scores = combine_scores(global_scores, user_scores, w_global=w_global, w_user=w_user)
+    # Build the prompt data
+    prompt_data = {
+        "default_layout": default_layout,
+        "global_scores": global_scores,
+        "user_scores": user_scores,
+        "visitor_meta": {
+            "session_count": visitor.sessions.count(),
+            "click_counts": user_scores,
+        }
+    }
 
-    # 5. Order sections by score
-    ordered_sections = sorted(default_layout, key=lambda s: -scores.get(s, 0))
+    # ---- CALL THE AI ----
+    ai_output = generate_llm_recommendations(prompt_data)
 
-    # 6. Build customizations (simple for now)
-    customizations = {
+    # If AI failed or returned empty JSON → fallback to rule-based
+    if not ai_output or "layout" not in ai_output:
+        return legacy_rule_based_recommendations(default_layout, visitor, global_scores, user_scores)
+
+    # Merge AI output with debug info
+    ai_output["debug"] = {
+        "global_scores": global_scores,
+        "user_scores": user_scores,
+        "used_llm": True,
+    }
+
+    return ai_output
+
+def legacy_rule_based_recommendations(default_layout, visitor, global_scores, user_scores):
+    ordered = sorted(default_layout, key=lambda s: -(global_scores.get(s, 0) + user_scores.get(s, 0)))
+
+    custom = {
         "header": {
-            "text": "Welcome back!" if visitor.sessions.count() > 1 else
-                    "Fast. Clean. Reliable.",
+            "text": "Welcome back!" if visitor.sessions.count() > 1 else "Fast. Clean. Reliable.",
             "style": "highlight" if visitor.sessions.count() > 1 else "default",
         }
     }
 
-    # Optional: highlight the first section in the ordered list
-    if ordered_sections:
-        first_section = ordered_sections[0]
-        if first_section != 'header':
-            customizations.setdefault(first_section, {})
-            # mark it as highlighted while preserving existing customizations
-            customizations[first_section]['highlight'] = True
-
-    # Debug info: clicks & sessions considered (limit to 20 ids for readability)
-    sessions = visitor.sessions.order_by('-started_at')
-    session_count = sessions.count()
-    interactions = Interaction.objects.filter(session__in=sessions, event_type="click")
-    section_clicks = Counter(i.element for i in interactions if i.element)
-
-    sessions_considered = [str(s.session_id) for s in (sessions[:20] if hasattr(sessions, '__iter__') else sessions)]
-    debug = {
-        'used_default': not bool(section_clicks),
-        'section_clicks': dict(section_clicks),
-        'sessions_considered': sessions_considered,
-        'session_count_considered': session_count,
-        'weights': {'w_global': w_global, 'w_user': w_user},
-        'default_layout': default_layout,
-    }
-
     return {
-        "layout": ordered_sections,
-        "scores": scores,
-        "global_scores": global_scores,
-        "user_scores": user_scores,
-        "customizations": customizations,
-        "debug": debug,
+        "layout": ordered,
+        "customizations": custom,
+        "debug": {
+            "fallback": True,
+        },
     }
 
 def landing_page(request):
     cookie_id = request.COOKIES.get("visitor_id")
 
-    if cookie_id:
-        visitor, _ = Visitor.objects.get_or_create(cookie_id=cookie_id)
-    else:
-        visitor = Visitor.objects.create()
-        cookie_id = str(visitor.cookie_id)
+    if not cookie_id:
+        # No cookies yet → First visit → NO tracking
+        return render(request, "landing/index_dynamic.html", {
+            "session_id": None,
+            "recommendations_json": json.dumps({}), 
+            "show_cookie_popup": True,
+        })
+
+    
+    visitor= Visitor.objects.get(cookie_id=cookie_id)
 
     # Close any old active sessions
     Session.objects.filter(visitor=visitor, is_active=True).update(is_active=False, ended_at=timezone.now())
@@ -160,8 +92,10 @@ def landing_page(request):
         referrer=request.META.get("HTTP_REFERER", "")
     )
 
-    # Generate layout recommendations
+    # Only call the AI recommendations when an existing cookie was present
     recommendations = generate_recommendations(visitor)
+
+
 
     response = render(
         request,
@@ -172,29 +106,54 @@ def landing_page(request):
         }
     )
 
-    response.set_cookie("visitor_id", cookie_id, max_age=60 * 60 * 24 * 365)
     return response
 
 
 @csrf_exempt
 def track_interactions(request):
-    if request.method == "POST":
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+    
+    try:
         data = json.loads(request.body)
-        session_id = data.get("session_id")
-        events = data.get("events", [])
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    
+    session_id = data.get("session_id")
+    if not session_id:
+        return JsonResponse({"error": "Missing session_id"}, status=400)
+    
+    try:
+        session = Session.objects.get(session_id=session_id)
+    except (Session.DoesNotExist, ValidationError, ValueError, TypeError):
+        return JsonResponse({"error": "Invalid session_id"}, status=400)
+    
+    events = data.get("events", [])
+    for e in events:
+        Interaction.objects.create(
+            session=session,
+            event_type=e.get("event_type"),
+            element=e.get("element"),
+            additional_data=e.get("additional_data", {}),
+        )
 
-        try:
-            session = Session.objects.get(session_id=session_id)
-        except Session.DoesNotExist:
-            return JsonResponse({"error": "Invalid session"}, status=400)
+    return JsonResponse({"status": "success"})
 
-        for e in events:
-            Interaction.objects.create(
-                session=session,
-                event_type=e.get("event_type"),
-                element=e.get("element"),
-                additional_data=e.get("additional_data", {}),
-            )
+@csrf_exempt
+def accept_cookies(request):
+    # Called by JS only when user accepts the popup
+    visitor = Visitor.objects.create()
+    cookie_id = str(visitor.cookie_id)
 
-        return JsonResponse({"status": "success"})
-    return JsonResponse({"error": "Invalid method"}, status=405)
+    # Create a new session
+    session = Session.objects.create(
+        visitor=visitor,
+        user_agent=request.META.get("HTTP_USER_AGENT", "") or None,
+        referrer=request.META.get("HTTP_REFERER", "") or None
+    )
+
+    # Return session id so client can start tracking immediately (and set cookie)
+    response = JsonResponse({"status": "accepted", "session_id": str(session.session_id)})
+    # set cookie for future requests;
+    response.set_cookie("visitor_id", cookie_id, max_age=60*60*24*365)
+    return response

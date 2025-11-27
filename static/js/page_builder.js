@@ -6,7 +6,7 @@ const sections = {
     <header data-section="header" class="hero ${data.style || ''}">
       <div class="container hero-content">
         <div>
-          <h1>${data.text}</h1>
+          <h1>${data.text || 'Fast. Clean. Reliable.'}</h1>
           <p>Premium car wash and detailing that brings back the showroom shine — quick, eco-friendly, and affordable.</p>
           <div class="hero-actions">
             <a class="btn primary" href="#booking">Book Now</a>

@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 
+
+
 <body data-session-id="{{ session_id }}">
   <nav class="nav container">
     <div class="brand">ShinePro Car Wash</div>
@@ -21,6 +23,23 @@
     </ul>
   </nav>
 
+  {% if show_cookie_popup %}
+  <div id="cookie-popup" class="cookie-popup">
+    <div class="cookie-box" role="dialog" aria-labelledby="cookie-title" aria-describedby="cookie-desc">
+      <h3 id="cookie-title">We use cookies</h3>
+      <p id="cookie-desc">
+        This site uses cookies to personalise content, analyse traffic and improve your experience.
+        By accepting you agree to our <a href="/terms/" target="_blank" rel="noopener">Terms &amp; Conditions</a>.
+      </p>
+
+      <div class="cookie-actions">
+        <button id="accept-cookies" class="btn primary">Accept</button>
+        <button id="decline-cookies" class="btn secondary">Decline</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div id="page-root"></div>
 
   <!-- Embed JSON recommendations -->
@@ -28,11 +47,13 @@
     {{ recommendations_json|safe }}
   </script>
 
+  <script src="{% static 'js/cookie_consent.js' %}"></script>
   <script src="{% static 'js/event_tracker.js' %}"></script>
   <script src="{% static 'js/page_builder.js' %}"></script>
   <footer class="container footer">
     <div>
-      &copy; ShinePro Car Wash — Call: <a href="tel:1234567890">123-456-7890</a> — Email: <a href="mailto:info@shinepro.example">info@shinepro.example</a>
+      &copy; ShinePro Car Wash — Call: <a href="tel:1234567890">123-456-7890</a> — Email: <a
+        href="mailto:info@shinepro.example">info@shinepro.example</a>
     </div>
   </footer>
 </body>
