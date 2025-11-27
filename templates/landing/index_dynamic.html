@@ -24,8 +24,8 @@
   </nav>
 
   {% if show_cookie_popup %}
-  <div id="cookie-popup" class="cookie-popup">
-    <div class="cookie-box" role="dialog" aria-labelledby="cookie-title" aria-describedby="cookie-desc">
+  <div id="cookie-popup" class="cookie-overlay" role="dialog" aria-labelledby="cookie-title" aria-describedby="cookie-desc" aria-modal="true" tabindex="-1">
+    <div class="cookie-box" role="document">
       <h3 id="cookie-title">We use cookies</h3>
       <p id="cookie-desc">
         This site uses cookies to personalise content, analyse traffic and improve your experience.
