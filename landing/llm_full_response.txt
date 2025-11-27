@@ -100,3 +100,14 @@
   "explanation": "Pricing has the strongest interaction signal (highest user_score and click_counts). Placed pricing directly after the header to surface it earlier. Added a soft highlight around pricing to draw attention without major layout changes; kept other sections in default order."
 }
 
+2025-11-27T15:03:06.069563 - {
+  "layout": ["pricing","header","features","services","testimonials","cta","contact"],
+  "customizations": {
+    "pricing": {
+      "style": "background: #fffbea; border: 2px solid #ffcc00; padding: 1rem; border-radius: 8px;",
+      "text": "Limited-time pricing — choose the plan that fits you best."
+    }
+  },
+  "explanation": "Pricing had the strongest interaction signal (highest user_score and click_counts). Reordered to surface pricing first and added a subtle highlight to the pricing section to draw attention, with a small text tweak to emphasize value."
+}
+

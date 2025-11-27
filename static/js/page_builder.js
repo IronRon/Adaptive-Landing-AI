@@ -158,6 +158,16 @@ layout.forEach((key) => {
     ? sections[key](customization)
     : `<section><p>Unknown section: ${key}</p></section>`;
   root.insertAdjacentHTML('beforeend', html);
+
+  // --- new: ensure inline style / text overrides are applied after insert ---
+  try {
+    const el = root.querySelector(`[data-section="${key}"]`);
+    if (el && customization.style) {
+      el.setAttribute('style', customization.style);
+    }
+  } catch (e) {
+    console.warn('apply customization failed for', key, e);
+  }
 });
 
 // append collected CSS to document head (if any)
