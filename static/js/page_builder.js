@@ -1,12 +1,17 @@
 const config = JSON.parse(document.getElementById("page-config").textContent);
 const root = document.getElementById("page-root");
 
+// helper to normalize incoming customization per section
+function getCustomization(key) {
+    return (config.customizations && config.customizations[key]) ? config.customizations[key] : {};
+}
+
 const sections = {
   header: (data) => `
-    <header data-section="header" class="hero ${data.style || ''}">
+    <header data-section="header" class="hero ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container hero-content">
         <div>
-          <h1>${data.text}</h1>
+          <h1>${data.text || 'Fast. Clean. Reliable.'}</h1>
           <p>Premium car wash and detailing that brings back the showroom shine — quick, eco-friendly, and affordable.</p>
           <div class="hero-actions">
             <a class="btn primary" href="#booking">Book Now</a>
@@ -21,7 +26,7 @@ const sections = {
     </header>`,
 
   services: (data) => `
-    <section id="services" data-section="services" class="cards ${data.highlight ? 'highlight' : ''}">
+    <section id="services" data-section="services" class="cards ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container">
         <h2>Our Services</h2>
         <div class="cards-grid">
@@ -33,7 +38,7 @@ const sections = {
     </section>`,
 
   pricing: (data) => `
-    <section id="pricing" data-section="pricing" class="pricing ${data.highlight ? 'highlight' : ''}">
+    <section id="pricing" data-section="pricing" class="pricing ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container">
         <h2>Pricing</h2>
         <div class="price-grid">
@@ -80,7 +85,7 @@ const sections = {
     </section>`,
 
   cta: (data) => `
-    <section id="booking" data-section="cta" class="cta ${data.highlight ? 'highlight' : ''}">
+    <section id="booking" data-section="cta" class="cta ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container">
         <h2>Ready for a clean ride?</h2>
         <p>Schedule online or call us for 10% off your first service.</p>
@@ -92,7 +97,7 @@ const sections = {
     </section>`,
 
   features: (data) => `
-    <section id="features" data-section="features" class="features">
+    <section id="features" data-section="features" class="features ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container">
         <h2>Why Choose ShinePro</h2>
         <div class="features-grid">
@@ -105,7 +110,7 @@ const sections = {
     </section>`,
 
   testimonials: (data) => `
-    <section id="testimonials" data-section="testimonials" class="testimonials">
+    <section id="testimonials" data-section="testimonials" class="testimonials ${data.styleClass || ''}" style="${data.style || ''}">
       <div class="container">
         <h2>What our customers say</h2>
         <div class="testimonials-list">
@@ -116,7 +121,7 @@ const sections = {
     </section>`,
 
   contact: (data) => `
-    <section id="contact" data-section="contact" class="contact container">
+    <section id="contact" data-section="contact" class="contact container ${data.styleClass || ''}" style="${data.style || ''}">
       <h2>Contact Us</h2>
       <div class="contact-grid">
         <form class="contact-form">
@@ -137,12 +142,41 @@ const sections = {
 // Render in order
 // Ensure defaults if layout missing
 const layout = Array.isArray(config.layout) ? config.layout : ['header','features','services','pricing','testimonials','cta','contact'];
+
+// collect CSS blocks from customizations (optional data.css per section)
+const collectedCss = [];
+
 layout.forEach((key) => {
+  const customization = getCustomization(key);
+  // if provided, gather css block
+  if (customization.css) {
+    // scope comment helps debugging; user-provided css is inserted as-is
+    collectedCss.push(`/* ${key} css */\n${customization.css}`);
+  }
+
   const html = sections[key]
-    ? sections[key](config.customizations && config.customizations[key] ? config.customizations[key] : {})
+    ? sections[key](customization)
     : `<section><p>Unknown section: ${key}</p></section>`;
   root.insertAdjacentHTML('beforeend', html);
+
+  // --- new: ensure inline style / text overrides are applied after insert ---
+  try {
+    const el = root.querySelector(`[data-section="${key}"]`);
+    if (el && customization.style) {
+      el.setAttribute('style', customization.style);
+    }
+  } catch (e) {
+    console.warn('apply customization failed for', key, e);
+  }
 });
+
+// append collected CSS to document head (if any)
+if (collectedCss.length) {
+  const styleEl = document.createElement('style');
+  styleEl.id = 'ai-custom-css';
+  styleEl.textContent = collectedCss.join('\n\n');
+  document.head.appendChild(styleEl);
+}
 
 // Debug panel: show whether default layout was used and click counts
 (function renderDebug() {

@@ -9,7 +9,8 @@ function getCookie(name) {
 	return null;
 }
 
-const sessionId = document.body && document.body.dataset && document.body.dataset.sessionId ? document.body.dataset.sessionId : null;
+let sessionId = document.body && document.body.dataset && document.body.dataset.sessionId ? document.body.dataset.sessionId : null;
+if (sessionId === "None" || sessionId === "null") sessionId = null;
 let events = [];
 
 function logEvent(type, element, extraData = {}) {
@@ -85,7 +86,17 @@ function sendEvents(payload) {
 	}
 }
 
+// Expose API to set session id
+window.setSessionId = function(sid) {
+    if (!sid) return;
+    sessionId = sid;
+    console.log('Session ID set for event tracker:', sessionId);
+};
+
 window.addEventListener('beforeunload', () => {
+	sessionId = document.body && document.body.dataset && document.body.dataset.sessionId ? document.body.dataset.sessionId : null;
+	if (sessionId === "None" || sessionId === "null") sessionId = null;
+
 	if (!events.length || !sessionId) return;
 	const payload = JSON.stringify({ session_id: sessionId, events: events });
 	sendEvents(payload);
