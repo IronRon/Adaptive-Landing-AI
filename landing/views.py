@@ -1,20 +1,26 @@
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from collections import Counter
 import uuid
-from .models import Visitor, Session, Interaction
+from .models import LandingPage, LandingSection, Visitor, Session, Interaction
 from .bandit import SectionBandit
 from .utils import get_user_section_scores, combine_scores
 from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
-def generate_recommendations(visitor):
+def generate_recommendations(visitor, sections, combined_css):
     # 1. Load valid sections (arms)
-    config = json.load(open("landing/bandit_config.json"))
-    default_layout = config["arms"]
+    default_layout = [sec.key for sec in sections]
+    assets = {
+        sec.key: {
+            "html": sec.html,
+        }
+        for sec in sections
+    }
+
 
     # 2. Global scores from bandit
     bandit = SectionBandit()
@@ -31,7 +37,9 @@ def generate_recommendations(visitor):
         "visitor_meta": {
             "session_count": visitor.sessions.count(),
             "click_counts": user_scores,
-        }
+        },
+        "assets": assets,
+        "combined_css": combined_css,
     }
 
     # ---- CALL THE AI ----
@@ -68,13 +76,40 @@ def legacy_rule_based_recommendations(default_layout, visitor, global_scores, us
         },
     }
 
+def build_combined_css(page):
+    css_parts = [page.global_css]
+
+    for sec in page.sections.order_by("order"):
+        if sec.css.strip():
+            css_parts.append(sec.css)
+
+    return "\n\n".join(css_parts)
+
+
 def landing_page(request):
     cookie_id = request.COOKIES.get("visitor_id")
+
+    page = LandingPage.objects.first()
+    if not page:
+        return render(request, "landing/index_static.html", {})
+    sections = page.sections.order_by("order")
+
+    section_data = {
+        sec.key: {
+            "html": sec.html,
+            "css": sec.css
+        }
+        for sec in sections
+    }
+
+    combined_css = build_combined_css(page)
 
     if not cookie_id:
         # No cookies yet → First visit → NO tracking
         return render(request, "landing/index_dynamic.html", {
             "session_id": None,
+            "builder_sections": json.dumps(section_data),
+            "combined_css": combined_css,
             "recommendations_json": json.dumps({}), 
             "show_cookie_popup": True,
         })
@@ -93,15 +128,15 @@ def landing_page(request):
     )
 
     # Only call the AI recommendations when an existing cookie was present
-    recommendations = generate_recommendations(visitor)
-
-
+    recommendations = generate_recommendations(visitor, sections, combined_css)
 
     response = render(
         request,
         "landing/index_dynamic.html",
         {
             "session_id": str(session.session_id),
+            "builder_sections": json.dumps(section_data),
+            "combined_css": combined_css,
             "recommendations_json": json.dumps(recommendations),
         }
     )
@@ -157,3 +192,92 @@ def accept_cookies(request):
     # set cookie for future requests;
     response.set_cookie("visitor_id", cookie_id, max_age=60*60*24*365)
     return response
+
+
+def builder_index(request):
+    pages = LandingPage.objects.all()
+    return render(request, "builder/index.html", {"pages": pages})
+
+def builder_new_page(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "My Landing Page")
+        page = LandingPage.objects.create(name=name)
+        return redirect("builder_edit_page", page_id=page.id)
+
+    return render(request, "builder/new_page.html")
+
+@csrf_exempt
+def builder_edit_page(request, page_id):
+    page = LandingPage.objects.get(id=page_id)
+    sections = page.sections.order_by("order")
+
+    return render(request, "builder/edit_page.html", {
+        "page": page,
+        "sections": sections,
+    })
+
+@csrf_exempt
+def builder_save_page(request, page_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid method"}, status=405)
+
+    page = LandingPage.objects.get(id=page_id)
+
+    data = json.loads(request.body)
+
+    # Save global CSS
+    page.global_css = data.get("global_css", "")
+    page.save()
+
+    # Save section order
+    for sec in data.get("sections", []):
+        section = LandingSection.objects.get(id=sec["id"])
+        section.order = sec["order"]
+        section.save()
+
+    return JsonResponse({"status": "ok"})
+
+def builder_new_section(request, page_id):
+    page = LandingPage.objects.get(id=page_id)
+
+    if request.method == "POST":
+        key = request.POST.get("key")
+        html = request.POST.get("html", "")
+        css = request.POST.get("css", "")
+        order = page.sections.count()
+
+        LandingSection.objects.create(
+            page=page,
+            key=key,
+            html=html,
+            css=css,
+            order=order,
+        )
+        return redirect("builder_edit_page", page_id=page_id)
+
+    return render(request, "builder/edit_section.html", {
+        "page": page,
+        "section": None,
+    })
+
+def builder_edit_section(request, section_id):
+    section = LandingSection.objects.get(id=section_id)
+    page = section.page
+
+    if request.method == "POST":
+        section.key = request.POST.get("key")
+        section.html = request.POST.get("html", "")
+        section.css = request.POST.get("css", "")
+        section.save()
+        return redirect("builder_edit_page", page_id=page.id)
+
+    return render(request, "builder/edit_section.html", {
+        "page": page,
+        "section": section,
+    })
+
+def builder_delete_section(request, section_id):
+    section = LandingSection.objects.get(id=section_id)
+    page_id = section.page.id
+    section.delete()
+    return redirect("builder_edit_page", page_id=page_id)

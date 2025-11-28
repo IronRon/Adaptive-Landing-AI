@@ -51,11 +51,6 @@ def generate_llm_recommendations(prompt_data: dict):
     Calls the LLM and returns JSON-based layout recommendations.
     """
 
-    asset_block = ""
-    path = ROOT / "static" / "sections_for_llm.txt"
-    snippet = _read(path=path)
-    if snippet:
-        asset_block = f"\n### SITE SECTIONS + CSS:\n{snippet}\n\n"
 
     prompt = f"""
     You are an AI assistant that personalises landing page layouts based on visitor behaviour and interaction data.
@@ -66,7 +61,9 @@ def generate_llm_recommendations(prompt_data: dict):
     User Scores: {prompt_data["user_scores"]}
     Visitor Metadata: {prompt_data["visitor_meta"]}
     SITE SECTIONS + CSS: included below for context
-    {asset_block}
+    {prompt_data["assets"]}
+    COMBINED CSS:
+    {prompt_data["combined_css"]}
 
     ### Task
     1) Prioritise sections according to the interaction data (user_scores first).

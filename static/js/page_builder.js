@@ -1,152 +1,52 @@
+console.log("🔧 Page Builder Loaded");
+
+// 1. Read data embedded by Django
 const config = JSON.parse(document.getElementById("page-config").textContent);
+const builderSections = JSON.parse(document.getElementById("page-sections").textContent);
+const combinedCss = document.getElementById("page-css").textContent;
+
 const root = document.getElementById("page-root");
+
+(function injectBaseCSS() {
+  if (!combinedCss.trim()) return;
+
+  const styleEl = document.createElement("style");
+  styleEl.id = "builder-base-css";
+  styleEl.textContent = combinedCss;
+  document.head.appendChild(styleEl);
+})();
 
 // helper to normalize incoming customization per section
 function getCustomization(key) {
-    return (config.customizations && config.customizations[key]) ? config.customizations[key] : {};
+  return (config.customizations && config.customizations[key]) ? config.customizations[key] : {};
 }
-
-const sections = {
-  header: (data) => `
-    <header data-section="header" class="hero ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container hero-content">
-        <div>
-          <h1>${data.text || 'Fast. Clean. Reliable.'}</h1>
-          <p>Premium car wash and detailing that brings back the showroom shine — quick, eco-friendly, and affordable.</p>
-          <div class="hero-actions">
-            <a class="btn primary" href="#booking">Book Now</a>
-            <a class="btn secondary" href="#pricing">View Pricing</a>
-            <a class="btn" href="#contact">Call Us</a>
-          </div>
-        </div>
-        <div class="hero-image">
-          <img src="/static/images/carwash.jpeg" alt="Car Wash" />
-        </div>
-      </div>
-    </header>`,
-
-  services: (data) => `
-    <section id="services" data-section="services" class="cards ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container">
-        <h2>Our Services</h2>
-        <div class="cards-grid">
-          <article class="card"><h3>Express Wash</h3><p>Quick exterior wash and dry.</p></article>
-          <article class="card"><h3>Deluxe Detail</h3><p>Full inside-out deep clean.</p></article>
-          <article class="card"><h3>Eco-Friendly</h3><p>Water-efficient biodegradable wash.</p></article>
-        </div>
-      </div>
-    </section>`,
-
-  pricing: (data) => `
-    <section id="pricing" data-section="pricing" class="pricing ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container">
-        <h2>Pricing</h2>
-        <div class="price-grid">
-          <div class="price">
-            <h4>Express</h4>
-            <p class="amount">$10</p>
-            <ul class="price-features">
-              <li>Exterior wash & dry</li>
-              <li>Quick hand-dry</li>
-            </ul>
-            <div class="price-actions">
-              <a class="btn primary" href="#booking">Buy Now</a>
-              <a class="btn secondary" href="#pricing">Details</a>
-            </div>
-          </div>
-
-          <div class="price">
-            <h4>Standard</h4>
-            <p class="amount">$25</p>
-            <ul class="price-features">
-              <li>Exterior + interior vacuum</li>
-              <li>Window clean & tire shine</li>
-            </ul>
-            <div class="price-actions">
-              <a class="btn primary" href="#booking">Buy Now</a>
-              <a class="btn secondary" href="#pricing">Details</a>
-            </div>
-          </div>
-
-          <div class="price">
-            <h4>Detail</h4>
-            <p class="amount">$75</p>
-            <ul class="price-features">
-              <li>Full detail: shampoo, polish, protect</li>
-              <li>Leather treatment (if applicable)</li>
-            </ul>
-            <div class="price-actions">
-              <a class="btn primary" href="#booking">Buy Now</a>
-              <a class="btn secondary" href="#pricing">Details</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>`,
-
-  cta: (data) => `
-    <section id="booking" data-section="cta" class="cta ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container">
-        <h2>Ready for a clean ride?</h2>
-        <p>Schedule online or call us for 10% off your first service.</p>
-        <div class="cta-actions">
-          <a class="btn primary" href="#contact">Buy Now</a>
-          <a class="btn secondary" href="#contact">Schedule</a>
-        </div>
-      </div>
-    </section>`,
-
-  features: (data) => `
-    <section id="features" data-section="features" class="features ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container">
-        <h2>Why Choose ShinePro</h2>
-        <div class="features-grid">
-          <div class="feature"><h3>Fast & Reliable</h3><p>Get in and out in under 20 minutes.</p></div>
-          <div class="feature"><h3>Eco Friendly</h3><p>Water-saving systems and biodegradable soaps.</p></div>
-          <div class="feature"><h3>Skilled Technicians</h3><p>Experienced staff who treat your car like their own.</p></div>
-          <div class="feature"><h3>Mobile Service</h3><p>We come to you for on-site detailing.</p></div>
-        </div>
-      </div>
-    </section>`,
-
-  testimonials: (data) => `
-    <section id="testimonials" data-section="testimonials" class="testimonials ${data.styleClass || ''}" style="${data.style || ''}">
-      <div class="container">
-        <h2>What our customers say</h2>
-        <div class="testimonials-list">
-          <blockquote class="testimonial">"Quick, friendly, and my car looks new again!" — <strong>Alex</strong></blockquote>
-          <blockquote class="testimonial">"Best value for money. Highly recommend." — <strong>Maria</strong></blockquote>
-        </div>
-      </div>
-    </section>`,
-
-  contact: (data) => `
-    <section id="contact" data-section="contact" class="contact container ${data.styleClass || ''}" style="${data.style || ''}">
-      <h2>Contact Us</h2>
-      <div class="contact-grid">
-        <form class="contact-form">
-          <label>Name<input type="text" name="name" required></label>
-          <label>Email<input type="email" name="email" required></label>
-          <label>Message<textarea name="message"></textarea></label>
-          <button class="btn primary" type="submit">Send Message</button>
-        </form>
-        <div class="contact-info">
-          <p><strong>Phone:</strong> <a href="tel:1234567890">123-456-7890</a></p>
-          <p><strong>Address:</strong> 123 Shine St, Clean City</p>
-          <p><strong>Hours:</strong> Mon-Sun 8am–6pm</p>
-        </div>
-      </div>
-    </section>`,
-};
 
 // Render in order
 // Ensure defaults if layout missing
-const layout = Array.isArray(config.layout) ? config.layout : ['header','features','services','pricing','testimonials','cta','contact'];
+const layout = Array.isArray(config.layout) ? config.layout : Object.keys(builderSections); // fallback: DB order
 
 // collect CSS blocks from customizations (optional data.css per section)
 const collectedCss = [];
 
+function renderTemplate(template, data) {
+  try {
+    // Wrap template as a JS template literal and execute
+    const fn = new Function("data", "with(data){ return `" + template + "` }");
+    return fn(data);
+  } catch (e) {
+    console.warn("Template render error:", e);
+    return template; // fallback to raw HTML if error
+  }
+}
+
+
 layout.forEach((key) => {
+  const sec = builderSections[key];
+  if (!sec) {
+    root.insertAdjacentHTML("beforeend", `<section><p>Unknown section: ${key}</p></section>`);
+    return;
+  }
+
   const customization = getCustomization(key);
   // if provided, gather css block
   if (customization.css) {
@@ -154,10 +54,10 @@ layout.forEach((key) => {
     collectedCss.push(`/* ${key} css */\n${customization.css}`);
   }
 
-  const html = sections[key]
-    ? sections[key](customization)
-    : `<section><p>Unknown section: ${key}</p></section>`;
-  root.insertAdjacentHTML('beforeend', html);
+  // Render the section as a template with AI overrides
+  const rendered = renderTemplate(sec.html, customization);
+  // Insert rendered HTML
+  root.insertAdjacentHTML("beforeend", rendered);
 
   // --- new: ensure inline style / text overrides are applied after insert ---
   try {
@@ -200,7 +100,7 @@ if (collectedCss.length) {
     const lines = [];
     lines.push(`<strong>Recommendations Debug</strong>`);
     lines.push(`<div><em>Note:</em> all fields from server-side ` +
-               `recommendations are shown below.</div>`);
+      `recommendations are shown below.</div>`);
     lines.push(`<div><h4>Debug object</h4><pre>${JSON.stringify(toRender.debug, null, 2)}</pre></div>`);
     lines.push(`<div><h4>Layout (final)</h4><pre>${JSON.stringify(toRender.layout, null, 2)}</pre></div>`);
     lines.push(`<div><h4>Scores (combined)</h4><pre>${JSON.stringify(toRender.scores, null, 2)}</pre></div>`);

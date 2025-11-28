@@ -43,3 +43,16 @@ class BanditArm(models.Model):
 
     def __str__(self):
         return f"{self.section}: pulls={self.pulls}, reward={self.reward}"
+    
+class LandingPage(models.Model):
+    name = models.CharField(max_length=255)
+    global_css = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class LandingSection(models.Model):
+    page = models.ForeignKey(LandingPage, on_delete=models.CASCADE, related_name="sections")
+    key = models.SlugField()       # e.g. "services", "pricing", etc.
+    order = models.IntegerField(default=0)
+    html = models.TextField()      # raw HTML snippet
+    css = models.TextField(blank=True)  
+    created_at = models.DateTimeField(auto_now_add=True)
