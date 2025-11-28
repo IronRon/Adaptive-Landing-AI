@@ -5,13 +5,13 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from collections import Counter
 import uuid
-from .models import LandingPage, LandingSection, Visitor, Session, Interaction
+from .models import AIRecommendation, LandingPage, LandingSection, Visitor, Session, Interaction
 from .bandit import SectionBandit
 from .utils import get_user_section_scores, combine_scores
 from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
-def generate_recommendations(visitor, sections, combined_css):
+def generate_recommendations(visitor, sections, combined_css, page):
     # 1. Load valid sections (arms)
     default_layout = [sec.key for sec in sections]
     assets = {
@@ -20,7 +20,6 @@ def generate_recommendations(visitor, sections, combined_css):
         }
         for sec in sections
     }
-
 
     # 2. Global scores from bandit
     bandit = SectionBandit()
@@ -48,6 +47,13 @@ def generate_recommendations(visitor, sections, combined_css):
     # If AI failed or returned empty JSON → fallback to rule-based
     if not ai_output or "layout" not in ai_output:
         return legacy_rule_based_recommendations(default_layout, visitor, global_scores, user_scores)
+
+    # save to DB
+    AIRecommendation.objects.create(
+        page=page,
+        visitor=visitor,
+        response_json=ai_output
+    )
 
     # Merge AI output with debug info
     ai_output["debug"] = {
@@ -128,7 +134,7 @@ def landing_page(request):
     )
 
     # Only call the AI recommendations when an existing cookie was present
-    recommendations = generate_recommendations(visitor, sections, combined_css)
+    recommendations = generate_recommendations(visitor, sections, combined_css, page)
 
     response = render(
         request,
@@ -210,10 +216,12 @@ def builder_new_page(request):
 def builder_edit_page(request, page_id):
     page = LandingPage.objects.get(id=page_id)
     sections = page.sections.order_by("order")
+    ai_logs = page.ai_recommendations.order_by("-created_at")[:20]  # latest 20
 
     return render(request, "builder/edit_page.html", {
         "page": page,
         "sections": sections,
+        "ai_logs": ai_logs,
     })
 
 @csrf_exempt

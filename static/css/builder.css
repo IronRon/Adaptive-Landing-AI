@@ -11,7 +11,7 @@
   --radius: 10px;
   --shadow-sm: 0 1px 2px rgba(16,24,40,0.04);
   --shadow-md: 0 8px 24px rgba(16,24,40,0.08);
-  --max-width: 980px;
+  --max-width: 1400px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   font-size: 16px;
   color-scheme: light;
@@ -54,6 +54,8 @@ main, .page {
 /* Left column: content */
 .builder-main {
   background: none;
+  display: flex;
+flex-direction: row;
 }
 
 /* Right column: sidebar / actions */
@@ -238,4 +240,88 @@ button:focus, a:focus, input:focus, textarea:focus {
   .builder-shell { gap: 14px; padding: 12px; }
   h1 { font-size: 1.25rem; }
   .button { padding: 8px 10px; font-size: .9rem; }
+}
+
+.card > h2 + ul.builder-list {
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 1px dashed rgba(15,23,42,0.04);
+}
+
+.card > h2 + ul.builder-list li {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff, #fbfdfe);
+  border: 1px solid rgba(15,23,42,0.04);
+  transition: box-shadow .12s ease, transform .06s ease;
+}
+
+.card > h2 + ul.builder-list li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(15,23,42,0.06);
+}
+
+/* Left column: timestamp and quick meta */
+.card > h2 + ul.builder-list li > strong:first-child {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* Meta rows in right column */
+.card > h2 + ul.builder-list li div {
+  font-size: 0.95rem;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+/* Label styling inside meta rows */
+.card > h2 + ul.builder-list li div > strong {
+  font-weight: 600;
+  color: #0f172a;
+  margin-right: 6px;
+  display: inline-block;
+  min-width: 110px;
+}
+
+/* Small badge for visitor id */
+.card > h2 + ul.builder-list li div strong + span,
+.card > h2 + ul.builder-list li div strong + code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  background: #f6f9f9;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(15,23,42,0.04);
+  color: #0f172a;
+  font-size: 0.85rem;
+}
+
+/* Layout array and small JSON preview */
+.card > h2 + ul.builder-list li div:nth-of-type(2) {
+  color: var(--muted);
+  font-family: ui-monospace, Menlo, monospace;
+  background: #fafafa;
+  padding: 6px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Explanation text */
+.card > h2 + ul.builder-list li div:has(> strong:contains("Explanation")) {
+  color: var(--muted);
+}
+
+/* Make the list responsive: stack on small screens */
+@media (max-width: 720px) {
+  .card > h2 + ul.builder-list li {
+    grid-template-columns: 1fr;
+  }
+  .card > h2 + ul.builder-list li > strong:first-child {
+    margin-top: 0;
+  }
 }

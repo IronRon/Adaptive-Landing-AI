@@ -56,3 +56,19 @@ class LandingSection(models.Model):
     html = models.TextField()      # raw HTML snippet
     css = models.TextField(blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
+
+class AIRecommendation(models.Model):
+    page = models.ForeignKey(
+        LandingPage,
+        on_delete=models.CASCADE,
+        related_name="ai_recommendations"
+    )
+    visitor = models.ForeignKey(
+        Visitor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ai_recommendations"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    response_json = models.JSONField()
