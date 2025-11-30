@@ -1,3 +1,4 @@
+# Views for landing pages: recommendations, session handling, tracking, and builder endpoints
 from django.shortcuts import redirect, render
 from django.utils import timezone
 import json
@@ -12,6 +13,8 @@ from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
 def generate_recommendations(visitor, sections, combined_css, page):
+    # Use bandit + user data and call the LLM to produce layout/customizations.
+    # If LLM fails, fall back to rule-based recommendations.
     # 1. Load valid sections (arms)
     default_layout = [sec.key for sec in sections]
     assets = {
@@ -65,6 +68,7 @@ def generate_recommendations(visitor, sections, combined_css, page):
     return ai_output
 
 def legacy_rule_based_recommendations(default_layout, visitor, global_scores, user_scores):
+    # Simple fallback: sort sections by combined score and provide basic header customizations
     ordered = sorted(default_layout, key=lambda s: -(global_scores.get(s, 0) + user_scores.get(s, 0)))
 
     custom = {
@@ -83,6 +87,7 @@ def legacy_rule_based_recommendations(default_layout, visitor, global_scores, us
     }
 
 def build_combined_css(page):
+    # Merge global page CSS and per-section CSS into a single string
     css_parts = [page.global_css]
 
     for sec in page.sections.order_by("order"):
@@ -93,6 +98,9 @@ def build_combined_css(page):
 
 
 def landing_page(request):
+    # Main landing view:
+    # - If no visitor cookie: show cookie popup and do not track
+    # - If cookie exists: create session, close old sessions, run recommendations and render page
     cookie_id = request.COOKIES.get("visitor_id")
 
     page = LandingPage.objects.first()
@@ -152,6 +160,7 @@ def landing_page(request):
 
 @csrf_exempt
 def track_interactions(request):
+    # Endpoint to receive posted interaction events from the client and persist them
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
     
@@ -182,6 +191,9 @@ def track_interactions(request):
 
 @csrf_exempt
 def accept_cookies(request):
+    # Called when user accepts cookie popup:
+    # - create Visitor and Session
+    # - return session_id and set visitor_id cookie
     # Called by JS only when user accepts the popup
     visitor = Visitor.objects.create()
     cookie_id = str(visitor.cookie_id)
@@ -201,10 +213,12 @@ def accept_cookies(request):
 
 
 def builder_index(request):
+    # Builder UI: list landing pages
     pages = LandingPage.objects.all()
     return render(request, "builder/index.html", {"pages": pages})
 
 def builder_new_page(request):
+    # Builder: create a new landing page (POST) or show form (GET)
     if request.method == "POST":
         name = request.POST.get("name", "My Landing Page")
         page = LandingPage.objects.create(name=name)
@@ -214,6 +228,7 @@ def builder_new_page(request):
 
 @csrf_exempt
 def builder_edit_page(request, page_id):
+    # Builder: edit page details and show recent AI logs
     page = LandingPage.objects.get(id=page_id)
     sections = page.sections.order_by("order")
     ai_logs = page.ai_recommendations.order_by("-created_at")[:20]  # latest 20
@@ -226,6 +241,7 @@ def builder_edit_page(request, page_id):
 
 @csrf_exempt
 def builder_save_page(request, page_id):
+    # Save page global CSS and section order via AJAX (JSON POST)
     if request.method != "POST":
         return JsonResponse({"error": "Invalid method"}, status=405)
 
@@ -246,6 +262,7 @@ def builder_save_page(request, page_id):
     return JsonResponse({"status": "ok"})
 
 def builder_new_section(request, page_id):
+    # Builder: create a new section for the page
     page = LandingPage.objects.get(id=page_id)
 
     if request.method == "POST":
@@ -269,6 +286,7 @@ def builder_new_section(request, page_id):
     })
 
 def builder_edit_section(request, section_id):
+    # Builder: edit an existing section
     section = LandingSection.objects.get(id=section_id)
     page = section.page
 
@@ -285,6 +303,7 @@ def builder_edit_section(request, section_id):
     })
 
 def builder_delete_section(request, section_id):
+    # Builder: delete a section and redirect back to page editor
     section = LandingSection.objects.get(id=section_id)
     page_id = section.page.id
     section.delete()

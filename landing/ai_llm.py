@@ -1,8 +1,4 @@
-# The responsibilities of this module:
-# Format the prompt
-# Call the OpenAI API
-# Parse JSON response safely
-# Return a dict containing layout + customisations
+# AI helper: build prompt, call OpenAI, and parse JSON responses for layout suggestions.
 
 import json
 from openai import OpenAI
@@ -12,7 +8,7 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 
-load_dotenv()  # take environment variables from .env file
+load_dotenv()  # load environment variables from .env
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in environment (.env missing or variable not defined)")
@@ -30,10 +26,8 @@ def _read(path: Path):
     return cleaned
 
 def safe_json_parse(text):
-    """
-    Safely parse malformed JSON from the LLM.
-    Returns dict or {} on failure.
-    """
+    # Try to parse JSON from LLM output and return a dict.
+    # On failure, attempt simple cleanup then log and return {}.
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -47,11 +41,8 @@ def safe_json_parse(text):
 
 
 def generate_llm_recommendations(prompt_data: dict):
-    """
-    Calls the LLM and returns JSON-based layout recommendations.
-    """
-
-
+    # Call the LLM with a prompt and expect ONLY JSON back.
+    # Returns a dict containing "layout" and optional "customizations".
     prompt = f"""
     You are an AI assistant that personalises landing page layouts based on visitor behaviour and interaction data.
     IMPORTANT: Return ONLY valid JSON as the single response. Do NOT return explanations or text outside JSON.
@@ -104,10 +95,10 @@ def generate_llm_recommendations(prompt_data: dict):
     # Prefer response.output_text if present, else fall back to the SDK message content
     out_text = getattr(response, "output_text", None) or response.choices[0].message.content
 
-    # Log to file (timestamped via logging.basicConfig) and also keep one-line safe log
+    # Log a short truncated version for diagnostics
     logging.info("LLM response (truncated 200 chars): %s", (out_text or "")[:200].replace("\n", "\\n"))
 
-    # If you want the full raw output in a separate file:
+    # Save full raw output to a file for debugging if possible
     try:
         with open(r'c:\Users\Ronak\Documents\MY STUFF1\comp sci\Year4\FYP\adaptive-landing-ai\landing\llm_full_response.txt', 'a', encoding='utf-8') as fh:
             fh.write(f"{datetime.utcnow().isoformat()} - {out_text}\n\n")

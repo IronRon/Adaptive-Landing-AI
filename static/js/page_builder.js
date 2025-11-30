@@ -1,6 +1,6 @@
 console.log("🔧 Page Builder Loaded");
 
-// 1. Read data embedded by Django
+// Read JSON data embedded into the page by Django
 const config = JSON.parse(document.getElementById("page-config").textContent);
 const builderSections = JSON.parse(document.getElementById("page-sections").textContent);
 const combinedCss = document.getElementById("page-css").textContent;
@@ -8,6 +8,7 @@ const combinedCss = document.getElementById("page-css").textContent;
 const root = document.getElementById("page-root");
 
 (function injectBaseCSS() {
+  // If there is combined CSS from the server, insert it into the document head
   if (!combinedCss.trim()) return;
 
   const styleEl = document.createElement("style");
@@ -16,50 +17,50 @@ const root = document.getElementById("page-root");
   document.head.appendChild(styleEl);
 })();
 
-// helper to normalize incoming customization per section
+// Return customization object for a section (or empty object)
 function getCustomization(key) {
   return (config.customizations && config.customizations[key]) ? config.customizations[key] : {};
 }
 
-// Render in order
-// Ensure defaults if layout missing
+// Determine final layout order, fallback to DB order if not provided
 const layout = Array.isArray(config.layout) ? config.layout : Object.keys(builderSections); // fallback: DB order
 
-// collect CSS blocks from customizations (optional data.css per section)
+// Hold CSS blocks collected from section customizations
 const collectedCss = [];
 
+// Render template string using data (safely attempts interpolation)
 function renderTemplate(template, data) {
   try {
-    // Wrap template as a JS template literal and execute
+    // Use a dynamic function to evaluate a template literal with 'data' in scope
     const fn = new Function("data", "with(data){ return `" + template + "` }");
     return fn(data);
   } catch (e) {
     console.warn("Template render error:", e);
-    return template; // fallback to raw HTML if error
+    // If render fails, return original template HTML
+    return template;
   }
 }
-
 
 layout.forEach((key) => {
   const sec = builderSections[key];
   if (!sec) {
+    // Show placeholder for unknown/missing sections
     root.insertAdjacentHTML("beforeend", `<section><p>Unknown section: ${key}</p></section>`);
     return;
   }
 
   const customization = getCustomization(key);
-  // if provided, gather css block
+  // Collect any CSS provided as part of customization
   if (customization.css) {
-    // scope comment helps debugging; user-provided css is inserted as-is
     collectedCss.push(`/* ${key} css */\n${customization.css}`);
   }
 
-  // Render the section as a template with AI overrides
+  // Render section HTML using overrides from customization
   const rendered = renderTemplate(sec.html, customization);
-  // Insert rendered HTML
+  // Insert the rendered HTML into the page
   root.insertAdjacentHTML("beforeend", rendered);
 
-  // --- new: ensure inline style / text overrides are applied after insert ---
+  // After inserting, apply inline style attribute if provided
   try {
     const el = root.querySelector(`[data-section="${key}"]`);
     if (el && customization.style) {
@@ -70,7 +71,7 @@ layout.forEach((key) => {
   }
 });
 
-// append collected CSS to document head (if any)
+// If any customization CSS was collected, append it to the head
 if (collectedCss.length) {
   const styleEl = document.createElement('style');
   styleEl.id = 'ai-custom-css';
@@ -78,7 +79,7 @@ if (collectedCss.length) {
   document.head.appendChild(styleEl);
 }
 
-// Debug panel: show whether default layout was used and click counts
+// Render a simple debug panel when debug info is present
 (function renderDebug() {
   try {
     const dbg = config.debug || null;
@@ -87,7 +88,7 @@ if (collectedCss.length) {
     const panel = document.createElement('aside');
     panel.className = 'debug-panel';
 
-    // Collect everything we want to show from the recommendations payload
+    // Gather key debug fields to show
     const toRender = {
       debug: dbg,
       layout: config.layout || null,
@@ -99,8 +100,7 @@ if (collectedCss.length) {
 
     const lines = [];
     lines.push(`<strong>Recommendations Debug</strong>`);
-    lines.push(`<div><em>Note:</em> all fields from server-side ` +
-      `recommendations are shown below.</div>`);
+    lines.push(`<div><em>Note:</em> all fields from server-side recommendations are shown below.</div>`);
     lines.push(`<div><h4>Debug object</h4><pre>${JSON.stringify(toRender.debug, null, 2)}</pre></div>`);
     lines.push(`<div><h4>Layout (final)</h4><pre>${JSON.stringify(toRender.layout, null, 2)}</pre></div>`);
     lines.push(`<div><h4>Scores (combined)</h4><pre>${JSON.stringify(toRender.scores, null, 2)}</pre></div>`);

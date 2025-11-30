@@ -178,3 +178,27 @@
   "explanation": "Pricing received the strongest interaction signal from the user data, so it was moved immediately after the header to catch attention early. Added a warm highlight style to pricing card to visually emphasize the section; kept other sections in their default order with minimal tweaks."
 }
 
+2025-11-28T11:03:20.399810 - {
+  "layout": ["header", "pricing", "features", "services", "cta", "contact", "testimonials"],
+  "customizations": {
+    "pricing": {
+      "style": "background: #fffbea; border: 2px solid #ffd700; padding: 1rem; border-radius: 8px;",
+      "text": "Pricing that fits every car and budget."
+    }
+  },
+  "explanation": "Pricing has the strongest interaction signal (0.888…), so it was moved directly after the header to capture attention early. The pricing card is highlighted with a soft yellow background and gold border to emphasize value. Other sections retain their default order. Optional text tweak provided for pricing to reinforce value proposition."
+}
+
+2025-11-28T11:08:43.268843 - {
+  "layout": ["header", "pricing", "features", "services", "cta", "contact", "testimonials"],
+  "customizations": {
+    "pricing": {
+      "style": "background: #fffbea; border: 2px solid #ffcc00; padding: 1rem; border-radius: 8px;"
+    },
+    "header": {
+      "style": "border-bottom: 3px solid #ffcc00; padding-bottom: 0.5rem;"
+    }
+  },
+  "explanation": "Highest interaction signal is for the Pricing section; moved Pricing up to appear second after the header. Added a warm highlight style to Pricing to draw attention without drastic changes. Kept other sections in their original order to preserve layout familiarity."
+}
+
