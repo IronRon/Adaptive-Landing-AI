@@ -29,6 +29,7 @@ db.sqlite3
 media/
 staticfiles/
 
+
 # Tests / coverage
 htmlcov/
 .tox/
