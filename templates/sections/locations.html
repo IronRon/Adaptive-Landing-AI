@@ -1,0 +1,53 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     LOCATIONS / HOURS – optional section
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section locations {{ locations_variant|default:'' }}" id="locations" data-section="locations" data-track="locations">
+  <div class="container">
+    <h2 class="section-heading">Locations &amp; Hours</h2>
+    <p class="section-subheading">Visit us at any of our convenient locations.</p>
+
+    <div class="locations-grid">
+
+      <div class="location-card" data-track-click="location-1">
+        <h3>Downtown</h3>
+        <address>
+          123 Main Street<br>
+          Springfield, IL 62701
+        </address>
+        <p class="location-hours">Mon–Sat: 7 am – 8 pm · Sun: 8 am – 6 pm</p>
+        <a href="tel:+12175551234" class="location-phone">(217) 555-1234</a>
+      </div>
+
+      <div class="location-card" data-track-click="location-2">
+        <h3>Westside</h3>
+        <address>
+          456 Oak Avenue<br>
+          Springfield, IL 62704
+        </address>
+        <p class="location-hours">Mon–Sat: 7 am – 9 pm · Sun: 8 am – 7 pm</p>
+        <a href="tel:+12175555678" class="location-phone">(217) 555-5678</a>
+      </div>
+
+      <div class="location-card" data-track-click="location-3">
+        <h3>Eastgate Mall</h3>
+        <address>
+          789 Commerce Blvd<br>
+          Springfield, IL 62703
+        </address>
+        <p class="location-hours">Mon–Sun: 6 am – 10 pm</p>
+        <a href="tel:+12175559012" class="location-phone">(217) 555-9012</a>
+      </div>
+
+    </div>
+
+    <!-- Read more button — only visible in compact mode (CSS controlled) -->
+    <button class="btn btn--text compact-read-more" aria-expanded="false" data-compact-toggle="locations" data-track-click="locations-read-more">
+      Show full details ▾
+    </button>
+
+    <div class="section-cta">
+      <a href="#pricing" class="btn btn--primary" data-track-click="locations-cta">Find a Plan for Your Nearest Location</a>
+    </div>
+  </div>
+</section>

@@ -97,6 +97,18 @@ def build_combined_css(page):
     return "\n\n".join(css_parts)
 
 
+def demo_landing_page(request):
+    """Hard-coded demo landing page — no DB, no bandit, just the frontend."""
+    return render(request, 'landing/landing_page.html', {
+        # Pass variant classes here to test different states, e.g.:
+        # 'hero_variant': 'hero-cta-emphasis',
+        # 'pricing_variant': 'highlight-plan-2',
+        # 'testimonials_variant': 'testimonials-single',
+        # 'faq_variant': 'faq-compact-top3',
+        # 'services_variant': 'featured-service-1',
+    })
+
+
 def landing_page(request):
     # Main landing view:
     # - If no visitor cookie: show cookie popup and do not track

@@ -1,0 +1,86 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     PRICING – 3 membership plans
+     Variants: .is-compact, .highlight-plan-1 / 2 / 3
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section pricing {{ pricing_variant|default:'' }}" id="pricing" data-section="pricing" data-track="pricing">
+  <div class="container">
+    <h2 class="section-heading">Simple, Transparent Pricing</h2>
+    <p class="section-subheading">Pick a plan. Wash unlimited. No hidden fees, no contracts.</p>
+
+    <div class="pricing-toggle" data-track-click="pricing-toggle">
+      <span class="toggle-label toggle-label--active" data-period="monthly">Monthly</span>
+      <button class="toggle-switch" role="switch" aria-checked="false" aria-label="Toggle annual pricing" data-track-click="pricing-toggle-switch">
+        <span class="toggle-thumb"></span>
+      </button>
+      <span class="toggle-label" data-period="annual">Annual <small class="badge">Save 20 %</small></span>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- Plan 1 — Basic -->
+      <div class="plan-card" data-plan="1" data-track-click="plan-1">
+        <div class="plan-header">
+          <h3 class="plan-name">Basic</h3>
+          <div class="plan-price">
+            <span class="price monthly-price">$19<small>/mo</small></span>
+            <span class="price annual-price" hidden>$182<small>/yr</small></span>
+          </div>
+        </div>
+        <ul class="plan-features">
+          <li>Unlimited exterior washes</li>
+          <li>Spot-free rinse</li>
+          <li>Free vacuums</li>
+          <li class="plan-feature--muted">Interior clean not included</li>
+          <li class="plan-feature--muted">No detailing</li>
+        </ul>
+        <a href="#contact" class="btn btn--outline btn--block" data-track-click="plan-1-cta">Get Basic</a>
+      </div>
+
+      <!-- Plan 2 — Plus (Most Popular) -->
+      <div class="plan-card plan-card--popular" data-plan="2" data-track-click="plan-2">
+        <span class="popular-tag">Most Popular</span>
+        <div class="plan-header">
+          <h3 class="plan-name">Plus</h3>
+          <div class="plan-price">
+            <span class="price monthly-price">$34<small>/mo</small></span>
+            <span class="price annual-price" hidden>$326<small>/yr</small></span>
+          </div>
+        </div>
+        <ul class="plan-features">
+          <li>Everything in Basic</li>
+          <li>Interior clean (bi-weekly)</li>
+          <li>Tyre &amp; wheel shine</li>
+          <li>Rain-X treatment</li>
+          <li class="plan-feature--muted">No ceramic coating</li>
+        </ul>
+        <a href="#contact" class="btn btn--primary btn--block" data-track-click="plan-2-cta">Get Plus</a>
+      </div>
+
+      <!-- Plan 3 — Premium -->
+      <div class="plan-card" data-plan="3" data-track-click="plan-3">
+        <div class="plan-header">
+          <h3 class="plan-name">Premium</h3>
+          <div class="plan-price">
+            <span class="price monthly-price">$59<small>/mo</small></span>
+            <span class="price annual-price" hidden>$566<small>/yr</small></span>
+          </div>
+        </div>
+        <ul class="plan-features">
+          <li>Everything in Plus</li>
+          <li>Full detail (monthly)</li>
+          <li>Ceramic coating (quarterly)</li>
+          <li>Priority lane — no waiting</li>
+          <li>Free air freshener refills</li>
+        </ul>
+        <a href="#contact" class="btn btn--outline btn--block" data-track-click="plan-3-cta">Get Premium</a>
+      </div>
+
+    </div>
+
+    <p class="pricing-guarantee">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--clr-success)" aria-hidden="true"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 17l-4-4 1.41-1.41L11 15.17l6.59-6.59L19 10l-8 8z"/></svg>
+      30-day money-back guarantee · No contract · Cancel anytime
+    </p>
+  </div>
+</section>

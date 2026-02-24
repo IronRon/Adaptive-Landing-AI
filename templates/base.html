@@ -1,0 +1,18 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}SparkleWash – Unlimited Car Wash Memberships{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'landing/styles.css' %}" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% block body %}{% endblock %}
+
+  <script src="{% static 'landing/ui.js' %}" defer></script>
+  <script src="{% static 'landing/tracking.js' %}" defer></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

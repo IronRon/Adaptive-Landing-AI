@@ -1,0 +1,44 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     ABOUT – company story with read-more expand
+     Variants: .is-compact
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section about {{ about_variant|default:'' }}" id="about" data-section="about" data-track="about">
+  <div class="container about-inner">
+    <div class="about-text">
+      <h2 class="section-heading">About SparkleWash</h2>
+
+      <p class="about-intro">
+        Founded in 2018, SparkleWash started with a single bay and a big dream: make professional-grade car care accessible to everyone. Today we operate 12&nbsp;locations and serve over 10,000&nbsp;members every&nbsp;month.
+      </p>
+
+      <div class="about-more" id="about-more">
+        <p>Our team of trained technicians uses eco-friendly, biodegradable products and reclaimed water systems to minimise our environmental footprint while delivering a spotless finish every time.</p>
+        <p>We believe in transparency — no hidden fees, no upsells, just honest service. That's why every membership comes with a 30-day money-back guarantee and the freedom to cancel anytime.</p>
+        <p>Whether you drive a daily commuter or a weekend sports car, SparkleWash treats every vehicle like it's our own. Come see the difference — your car will thank you.</p>
+      </div>
+
+      <!-- Read more toggle — only visible in compact mode (CSS controlled) -->
+      <button class="btn btn--text read-more-toggle compact-read-more" aria-expanded="false" aria-controls="about-more" data-track-click="about-read-more">
+        Read more ▾
+      </button>
+
+      <a href="#pricing" class="btn btn--accent section-inline-cta" data-track-click="about-cta">Become a Member Today</a>
+    </div>
+
+    <div class="about-stats">
+      <div class="stat">
+        <span class="stat-number">12</span>
+        <span class="stat-label">Locations</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">10 k+</span>
+        <span class="stat-label">Members</span>
+      </div>
+      <div class="stat">
+        <span class="stat-number">50 k+</span>
+        <span class="stat-label">Washes / mo</span>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SparkleWash – Unlimited Car Wash Memberships{% endblock %}
+
+{% block body %}
+{# ──────────────────────────────────────────────────────────────
+   SECTION ORDER — reorder these includes to reorder the page.
+   Each section is self-contained. Variant classes are passed
+   via template variables (hero_variant, pricing_variant, etc.)
+   or hard-coded below for the demo.
+   ────────────────────────────────────────────────────────────── #}
+
+{% include "sections/header.html" %}
+{% include "sections/hero.html" %}
+{% include "sections/trust_bar.html" %}
+{% include "sections/services.html" %}
+{% include "sections/pricing.html" %}
+{% include "sections/testimonials.html" %}
+{% include "sections/about.html" %}
+{% include "sections/locations.html" %}
+{% include "sections/faq.html" %}
+{% include "sections/contact.html" %}
+{% include "sections/footer.html" %}
+{% endblock %}

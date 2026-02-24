@@ -16,4 +16,7 @@ urlpatterns = [
 
     path('track-interactions/', views.track_interactions, name='track_interactions'),
     path('accept-cookies/', views.accept_cookies, name='accept_cookies'),
+
+    # Demo landing page (hard-coded, no DB needed)
+    path('demo/', views.demo_landing_page, name='demo_landing'),
 ]
