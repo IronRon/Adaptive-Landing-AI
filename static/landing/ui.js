@@ -219,7 +219,7 @@
     // Remove known variant classes
     const knownVariants = [
       'hero-compact', 'hero-cta-emphasis',
-      'is-compact',
+      'is-compact', 'is-hidden', 'section-promoted',
       'featured-service-1', 'featured-service-2', 'featured-service-3',
       'highlight-plan-1', 'highlight-plan-2', 'highlight-plan-3',
       'testimonials-single',
@@ -233,6 +233,73 @@
     const el = document.getElementById(sectionId);
     if (!el) return;
     el.classList.toggle('is-compact', on);
+  };
+
+  /* ================================================================
+     8b. HIDE / SHOW SECTION
+         window.hideSection('faq')   → adds .is-hidden (display:none)
+         window.showSection('faq')   → removes .is-hidden
+     ================================================================ */
+  window.hideSection = function (sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('is-hidden');
+  };
+
+  window.showSection = function (sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.remove('is-hidden');
+  };
+
+  /* ================================================================
+     8c. PROMOTE / DEMOTE SECTION  (reorder to top)
+         window.promoteSection('pricing')  → moves pricing right
+         below trust bar via CSS order.
+         window.demoteSection('pricing')   → resets to default order.
+     ================================================================ */
+  window.promoteSection = function (sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.add('section-promoted');
+  };
+
+  window.demoteSection = function (sectionId) {
+    const el = document.getElementById(sectionId);
+    if (el) el.classList.remove('section-promoted');
+  };
+
+  /* ================================================================
+     8d. APPLY BACKEND INSTRUCTIONS
+         Designed for future backend use. Accepts an object like:
+         {
+           compact:  ['about', 'faq'],
+           hide:     ['locations'],
+           promote:  'pricing',
+           variants: { hero: 'hero-cta-emphasis', pricing: 'highlight-plan-2' }
+         }
+     ================================================================ */
+  window.applyPageConfig = function (cfg) {
+    if (!cfg) return;
+
+    // Compact sections
+    if (Array.isArray(cfg.compact)) {
+      cfg.compact.forEach(id => window.toggleCompact(id, true));
+    }
+
+    // Hidden sections
+    if (Array.isArray(cfg.hide)) {
+      cfg.hide.forEach(id => window.hideSection(id));
+    }
+
+    // Promote a section to the top
+    if (cfg.promote) {
+      window.promoteSection(cfg.promote);
+    }
+
+    // Per-section variant classes
+    if (cfg.variants && typeof cfg.variants === 'object') {
+      Object.entries(cfg.variants).forEach(([id, cls]) => {
+        window.setVariant(id, cls);
+      });
+    }
   };
 
   /* ================================================================
@@ -251,6 +318,90 @@
   }
 
   /* ================================================================
+     10. COOKIE CONSENT
+     Shows the cookie modal on every visit unless the user has accepted.
+     Accepting sets a persistent cookie sw_cookie_consent=accepted.
+     Declining does nothing — modal reappears next page load.
+     Tracking is only started after consent is given.
+     ================================================================ */
+  function initCookieConsent() {
+    const accepted = document.cookie.includes('sw_cookie_consent=accepted');
+    const modal    = $('#cookie-popup');
+
+    if (accepted) {
+      // Already consented — remove modal, start tracking
+      if (modal) modal.remove();
+      startTracking();
+      return;
+    }
+
+    // Show modal
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.classList.add('cookie-modal-open');
+
+    // Focus trap
+    const focusable = [...modal.querySelectorAll('button, a[href]')];
+    if (focusable.length) focusable[0].focus();
+
+    modal.addEventListener('keydown', e => {
+      if (e.key !== 'Tab' || !focusable.length) return;
+      if (e.shiftKey && document.activeElement === focusable[0]) {
+        e.preventDefault();
+        focusable[focusable.length - 1].focus();
+      } else if (!e.shiftKey && document.activeElement === focusable[focusable.length - 1]) {
+        e.preventDefault();
+        focusable[0].focus();
+      }
+    });
+
+    // Block clicks on overlay backdrop
+    modal.addEventListener('click', e => {
+      if (e.target === modal) { e.preventDefault(); e.stopPropagation(); }
+    });
+
+    const closeModal = () => {
+      document.body.classList.remove('cookie-modal-open');
+      modal.remove();
+    };
+
+    // ACCEPT
+    const acceptBtn = $('#accept-cookies');
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', () => {
+        // Set cookie — 1 year expiry
+        document.cookie = 'sw_cookie_consent=accepted;path=/;max-age=' + (60*60*24*365) + ';SameSite=Lax';
+        closeModal();
+        startTracking();
+
+        // Also call the backend accept-cookies endpoint (creates Visitor + sets visitor_id cookie)
+        const csrfToken = (document.cookie.match(/(^| )csrftoken=([^;]+)/) || [])[2] || '';
+        fetch('/accept-cookies/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+        }).catch(() => {});
+      });
+    }
+
+    // DECLINE — just close modal (no cookie set, so it will reappear on next visit)
+    const declineBtn = $('#decline-cookies');
+    if (declineBtn) {
+      declineBtn.addEventListener('click', () => {
+        closeModal();
+        // Tracking does NOT start
+      });
+    }
+  }
+
+  /* Helper: start tracking only after cookie consent */
+  function startTracking() {
+    if (window.SparkleTracker && typeof window.SparkleTracker._init === 'function') {
+      window.SparkleTracker._init();
+    }
+  }
+
+  /* ================================================================
      INIT
      ================================================================ */
   document.addEventListener('DOMContentLoaded', () => {
@@ -263,6 +414,7 @@
     initFAQ();
     initPlanHighlight();
     initSmoothScroll();
+    initCookieConsent();
   });
 
 })();

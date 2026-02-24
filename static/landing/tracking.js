@@ -373,14 +373,20 @@
   }
 
   /* ── Public API ─────────────────────────────────────────────── */
-  window.SparkleTracker = {
-    track,
-    flush,
-    getSessionId: () => sessionId,
-  };
+  let _initialised = false;
 
-  /* ── Init ───────────────────────────────────────────────────── */
-  document.addEventListener('DOMContentLoaded', () => {
+  function _init() {
+    if (_initialised) return;
+    _initialised = true;
+
+    if (CONFIG.debug) {
+      console.log(
+        '%c TRACKER ',
+        'background:#22c55e;color:#fff;padding:2px 8px;border-radius:3px',
+        'Cookie consent granted — tracking started.'
+      );
+    }
+
     track('page_view', { referrer: document.referrer || null });
     initClickTracking();
     initHoverTracking();
@@ -389,6 +395,21 @@
     initTimeOnPage();
     initFormTracking();
     startBatchTimer();
+  }
+
+  window.SparkleTracker = {
+    track,
+    flush,
+    getSessionId: () => sessionId,
+    _init,
+  };
+
+  /* ── Auto-init if cookies were already accepted ─────────────── */
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.cookie.includes('sw_cookie_consent=accepted')) {
+      _init();
+    }
+    // Otherwise, ui.js cookie-consent handler calls SparkleTracker._init()
   });
 
 })();

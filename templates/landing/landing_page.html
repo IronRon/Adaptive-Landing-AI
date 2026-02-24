@@ -5,12 +5,37 @@
 
 {% block body %}
 {# ──────────────────────────────────────────────────────────────
-   SECTION ORDER — reorder these includes to reorder the page.
-   Each section is self-contained. Variant classes are passed
-   via template variables (hero_variant, pricing_variant, etc.)
-   or hard-coded below for the demo.
+   COOKIE CONSENT MODAL
+   Shown on every visit until the user clicks "Accept".
+   Declining keeps the modal on every page load.
    ────────────────────────────────────────────────────────────── #}
+<div id="cookie-popup" class="cookie-overlay" role="dialog"
+     aria-labelledby="cookie-title" aria-describedby="cookie-desc"
+     aria-modal="true" tabindex="-1" hidden>
+  <div class="cookie-box" role="document">
+    <h3 id="cookie-title">🍪 We Use Cookies</h3>
+    <p id="cookie-desc">
+      This site uses cookies to remember your preferences, personalise content
+      and analyse how you interact with the page.
+      By accepting, you agree to our
+      <a href="/terms/" target="_blank" rel="noopener">Terms&nbsp;&amp;&nbsp;Conditions</a>
+      and
+      <a href="/privacy/" target="_blank" rel="noopener">Privacy&nbsp;Policy</a>.
+    </p>
+    <div class="cookie-actions">
+      <button id="accept-cookies" class="btn btn--primary">Accept Cookies</button>
+      <button id="decline-cookies" class="btn btn--outline">Decline</button>
+    </div>
+  </div>
+</div>
 
+{# ──────────────────────────────────────────────────────────────
+   SECTION ORDER — wrapped in .page-sections for CSS-order reorder.
+   Header + Hero stay fixed at the top. Other sections have order:10
+   by default; adding .section-promoted pushes one to order:3 (right
+   below trust bar). Backend can also set is-hidden to hide a section.
+   ────────────────────────────────────────────────────────────── #}
+<div class="page-sections">
 {% include "sections/header.html" %}
 {% include "sections/hero.html" %}
 {% include "sections/trust_bar.html" %}
@@ -22,4 +47,5 @@
 {% include "sections/faq.html" %}
 {% include "sections/contact.html" %}
 {% include "sections/footer.html" %}
+</div>
 {% endblock %}

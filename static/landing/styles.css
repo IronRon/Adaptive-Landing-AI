@@ -967,3 +967,88 @@ button { font: inherit; cursor: pointer; border: none; background: none; }
   color: var(--clr-text-muted);
 }
 .pricing-guarantee svg { flex-shrink: 0; }
+
+/* ================================================================
+   17. HIDE SECTION VARIANT
+   ================================================================ */
+.section.is-hidden {
+  display: none !important;
+}
+
+/* ================================================================
+   18. SECTION REORDER — move-to-top uses CSS order + flexbox wrapper
+   The .page-sections wrapper must be display:flex; flex-direction:column.
+   Sections have order:10 by default. .section-promoted → order:1
+   (sits right after hero which is order:0).
+   ================================================================ */
+.page-sections {
+  display: flex;
+  flex-direction: column;
+}
+.page-sections > .section {
+  order: 10;
+}
+/* Hero and header always stay at the top */
+.page-sections > .site-header { order: 0; }
+.page-sections > .hero         { order: 1; }
+.page-sections > .trust-bar     { order: 2; }
+.page-sections > .site-footer   { order: 99; }
+/* Promoted section sits right after trust bar */
+.page-sections > .section.section-promoted { order: 3; }
+
+/* ================================================================
+   19. COOKIE CONSENT MODAL
+   ================================================================ */
+.cookie-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .55);
+  backdrop-filter: blur(4px);
+}
+
+.cookie-box {
+  background: var(--clr-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl) var(--space-2xl);
+  max-width: 480px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.cookie-box h3 {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  margin-bottom: var(--space-sm);
+}
+
+.cookie-box p {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-muted);
+  line-height: 1.7;
+  margin-bottom: var(--space-lg);
+}
+
+.cookie-box p a {
+  color: var(--clr-primary);
+  text-decoration: underline;
+}
+
+.cookie-actions {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: center;
+}
+
+.cookie-actions .btn {
+  min-width: 120px;
+}
+
+/* Prevent scroll when modal is open */
+body.cookie-modal-open {
+  overflow: hidden;
+}
