@@ -1,0 +1,29 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     TRUST BAR – logos / badges
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section trust-bar {{ trust_variant|default:'' }}" id="trust-bar" data-section="trust-bar" data-track="trust-bar">
+  <div class="container">
+    <ul class="trust-list">
+      <li class="trust-item">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--clr-accent)" aria-hidden="true"><path d="M12 1l3.09 6.26L22 8.27l-5 4.87L18.18 20 12 16.77 5.82 20 7 13.14l-5-4.87 6.91-1.01z"/></svg>
+        <span>4.9★ on Google</span>
+      </li>
+      <li class="trust-item">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--clr-accent)" aria-hidden="true"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 14.5l-4-4 1.41-1.41L11 13.67l5.59-5.58L18 9.5l-7 7z"/></svg>
+        <span>50,000+ Washes</span>
+      </li>
+      <li class="trust-item">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--clr-accent)" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93h2c0 3.02 2.07 5.55 5 6.26v1.67zm7-3.43A7.96 7.96 0 0020 12h2c0 4.08-3.05 7.44-7 7.93v-1.67a5.98 5.98 0 004-5.76z"/></svg>
+        <span>Eco-Friendly Products</span>
+      </li>
+      <li class="trust-item">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--clr-accent)" aria-hidden="true"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 17l-4-4 1.41-1.41L11 15.17l6.59-6.59L19 10l-8 8z"/></svg>
+        <span>100 % Satisfaction</span>
+      </li>
+    </ul>
+    <div class="section-cta" style="margin-top:var(--space-lg)">
+      <a href="#pricing" class="btn btn--accent btn--small" data-track-click="trust-cta">See Membership Plans →</a>
+    </div>
+  </div>
+</section>

@@ -1,25 +1,39 @@
+"""
+Scoring utilities for the personalisation layer.
+
+These helpers aggregate tracked events into per-section scores that can
+be consumed by the bandit / AI recommendation pipeline.
+"""
+
 from collections import Counter
-from .models import Interaction, Session
+
+from .models import Event, Session
+
 
 def get_user_section_scores(visitor):
-    """Calculate section scores by aggregating clicks across all sessions.
+    """Calculate per-section engagement scores from a visitor's click history.
 
-    This matches the behavior in `generate_demo_recommendations` which
-    considers all sessions when computing click counts for layout choices.
-    Returns a mapping section -> normalized score (0..1).
+    Aggregates *click* events across every session the visitor has had.
+    Returns a mapping ``{section_key: normalised_score}`` where scores
+    are in the range 0–1.
     """
-    sessions = visitor.sessions.order_by('-started_at')
+    sessions = visitor.sessions.order_by("-started_at")
     if not sessions.exists():
         return {}
 
-    interactions = Interaction.objects.filter(session__in=sessions, event_type="click")
-    clicks = [i.element for i in interactions if i.element]
+    # Use the dedicated 'section' column (falls back to 'element' for
+    # events that don't carry a section value).
+    clicks = (
+        Event.objects.filter(session__in=sessions, event_type="click")
+        .values_list("section", "element")
+    )
 
-    counter = Counter(clicks)
+    labels = [section or element for section, element in clicks if section or element]
+    counter = Counter(labels)
     total = sum(counter.values()) or 1
 
-    # Normalize 0–1
-    return {section: count / total for section, count in counter.items()}
+    # Normalise 0–1
+    return {key: count / total for key, count in counter.items()}
 
 def combine_scores(global_scores, user_scores, w_global=0.7, w_user=0.3):
     combined = {}

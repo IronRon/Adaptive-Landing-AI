@@ -1,0 +1,78 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     SERVICES – card grid
+     Variants: .is-compact, .featured-service-1 / 2 / 3
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section services {{ services_variant|default:'' }}" id="services" data-section="services" data-track="services">
+  <div class="container">
+    <h2 class="section-heading">Our Services</h2>
+    <p class="section-subheading">From a quick rinse to a full detail — we've got your ride covered.</p>
+
+    <div class="services-grid">
+
+      <!-- Card 1 -->
+      <div class="service-card" data-service="1" data-track-click="service-1">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><rect x="8" y="18" width="32" height="16" rx="4"/><circle cx="16" cy="38" r="3"/><circle cx="32" cy="38" r="3"/><path d="M14 18l4-10h12l4 10"/></svg>
+        </div>
+        <h3>Exterior Wash</h3>
+        <p>High-pressure rinse, foam bath, spot-free rinse &amp; air dry. Sparkling in under 5&nbsp;minutes.</p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="service-card" data-service="2" data-track-click="service-2">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><rect x="6" y="10" width="36" height="28" rx="4"/><path d="M6 20h36M16 20v18M32 20v18"/></svg>
+        </div>
+        <h3>Interior Clean</h3>
+        <p>Full vacuum, dashboard wipe, window cleaning &amp; air freshener. Feel-good cabin vibes.</p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="service-card" data-service="3" data-track-click="service-3">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><path d="M24 4v8M4 24h8M36 24h8M24 36v8M10 10l6 6M32 10l-6 6M10 38l6-6M32 38l-6-6"/><circle cx="24" cy="24" r="8"/></svg>
+        </div>
+        <h3>Full Detailing</h3>
+        <p>Hand wash, clay bar, polish, interior shampoo — the works. Show-car finish guaranteed.</p>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="service-card" data-service="4" data-track-click="service-4">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><path d="M12 36c0-12 12-28 12-28s12 16 12 28c0 4-5.37 8-12 8s-12-4-12-8z"/></svg>
+        </div>
+        <h3>Wax &amp; Seal</h3>
+        <p>Premium carnauba wax or synthetic sealant for long-lasting gloss and paint protection.</p>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="service-card" data-service="5" data-track-click="service-5">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><path d="M8 40l8-16 8 10 8-20 8 26"/><rect x="4" y="4" width="40" height="40" rx="6"/></svg>
+        </div>
+        <h3>Ceramic Coating</h3>
+        <p>Professional-grade ceramic layer that repels water, dirt &amp; UV for up to 2&nbsp;years.</p>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="service-card" data-service="6" data-track-click="service-6">
+        <div class="service-icon">
+          <svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--clr-primary)" stroke-width="2"><circle cx="24" cy="24" r="18"/><path d="M24 6v36M6 24h36"/><ellipse cx="24" cy="24" rx="10" ry="18"/></svg>
+        </div>
+        <h3>Tyre &amp; Wheel Care</h3>
+        <p>Brake-dust removal, tyre dressing &amp; alloy polish. Wheels that look factory-fresh.</p>
+      </div>
+
+    </div>
+
+    <!-- Read more button — only visible in compact mode (CSS controlled) -->
+    <button class="btn btn--text compact-read-more" aria-expanded="false" data-compact-toggle="services" data-track-click="services-read-more">
+      Show all services ▾
+    </button>
+
+    <div class="section-cta">
+      <a href="#pricing" class="btn btn--primary" data-track-click="services-cta">Get Unlimited Access to All Services</a>
+    </div>
+  </div>
+</section>

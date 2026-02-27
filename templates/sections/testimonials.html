@@ -1,0 +1,98 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     TESTIMONIALS – carousel: 3 visible at once / single variant: 1 large
+     Variants: .is-compact, .testimonials-single
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section testimonials {{ testimonials_variant|default:'' }}" id="testimonials" data-section="testimonials" data-track="testimonials">
+  <div class="container">
+    <h2 class="section-heading">What Our Members Say</h2>
+    <p class="section-subheading">Real customers, real results.</p>
+
+    <div class="testimonial-carousel" data-carousel>
+      <div class="carousel-track">
+
+        <!-- Testimonial 1 -->
+        <div class="testimonial-card" data-testimonial="1" data-track-click="testimonial-1">
+          <div class="testimonial-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testimonial-quote">
+            "I haven't washed my car myself in over a year — SparkleWash does it better than I ever could. The ceramic coating keeps it glossy for weeks!"
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>James R.</strong> · Premium Member
+          </cite>
+        </div>
+
+        <!-- Testimonial 2 -->
+        <div class="testimonial-card" data-testimonial="2" data-track-click="testimonial-2">
+          <div class="testimonial-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testimonial-quote">
+            "Best value for money I've found. The Plus plan pays for itself after just two washes a month. Highly recommend."
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>Sarah T.</strong> · Plus Member
+          </cite>
+        </div>
+
+        <!-- Testimonial 3 -->
+        <div class="testimonial-card" data-testimonial="3" data-track-click="testimonial-3">
+          <div class="testimonial-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testimonial-quote">
+            "Super convenient — I just drive through on my way to work. The staff are always friendly and the results are consistently great."
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>Michael K.</strong> · Basic Member
+          </cite>
+        </div>
+
+        <!-- Testimonial 4 -->
+        <div class="testimonial-card" data-testimonial="4" data-track-click="testimonial-4">
+          <div class="testimonial-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testimonial-quote">
+            "Signed up for the family plan and it's been a game-changer. All three cars stay spotless and we're saving a fortune compared to ad-hoc washes."
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>Linda &amp; Dave M.</strong> · Premium Member
+          </cite>
+        </div>
+
+        <!-- Testimonial 5 -->
+        <div class="testimonial-card" data-testimonial="5" data-track-click="testimonial-5">
+          <div class="testimonial-stars" aria-label="4 out of 5 stars">★★★★☆</div>
+          <blockquote class="testimonial-quote">
+            "The tyre &amp; wheel care service is outstanding. My alloys look brand new every single time. Can't fault the attention to detail."
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>Chris P.</strong> · Plus Member
+          </cite>
+        </div>
+
+        <!-- Testimonial 6 -->
+        <div class="testimonial-card" data-testimonial="6" data-track-click="testimonial-6">
+          <div class="testimonial-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testimonial-quote">
+            "I was sceptical about a membership but tried the 30-day guarantee. Within a week I knew I was keeping it. Incredible quality at every visit."
+          </blockquote>
+          <cite class="testimonial-author">
+            <strong>Priya S.</strong> · Basic Member
+          </cite>
+        </div>
+
+      </div>
+
+      <!-- Carousel controls -->
+      <div class="carousel-controls">
+        <button class="carousel-btn carousel-prev" aria-label="Previous testimonials">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="carousel-dots" aria-label="Carousel pages"></div>
+        <button class="carousel-btn carousel-next" aria-label="Next testimonials">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="section-cta">
+      <a href="#pricing" class="btn btn--primary" data-track-click="testimonials-cta">Join Thousands of Happy Members</a>
+    </div>
+  </div>
+</section>

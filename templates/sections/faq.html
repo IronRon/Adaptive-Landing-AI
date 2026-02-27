@@ -1,0 +1,102 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     FAQ – accordion
+     Variants: .is-compact, .faq-compact-top3
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section faq {{ faq_variant|default:'' }}" id="faq" data-section="faq" data-track="faq">
+  <div class="container">
+    <h2 class="section-heading">Frequently Asked Questions</h2>
+    <p class="section-subheading">Everything you need to know about your membership.</p>
+
+    <div class="faq-list">
+
+      <details class="faq-item" data-faq="1" data-track-click="faq-1">
+        <summary class="faq-question">
+          <span>How does the unlimited wash membership work?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Sign up for a plan, attach your membership tag to your windshield, and drive through any SparkleWash location as often as you like. There are no per-wash charges and no limits on visits.</p>
+        </div>
+      </details>
+
+      <details class="faq-item" data-faq="2" data-track-click="faq-2">
+        <summary class="faq-question">
+          <span>Can I cancel at any time?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Absolutely. There are no contracts or cancellation fees. You can cancel online or in-store, and your membership stays active until the end of the current billing cycle.</p>
+        </div>
+      </details>
+
+      <details class="faq-item" data-faq="3" data-track-click="faq-3">
+        <summary class="faq-question">
+          <span>What's included in each plan?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p><strong>Basic</strong> covers unlimited exterior washes and vacuums. <strong>Plus</strong> adds bi-weekly interior cleaning, tyre shine, and Rain-X. <strong>Premium</strong> adds monthly full details, quarterly ceramic coating, and priority-lane access.</p>
+        </div>
+      </details>
+
+      <details class="faq-item faq-item--extra" data-faq="4" data-track-click="faq-4">
+        <summary class="faq-question">
+          <span>How am I billed?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Monthly plans are billed on the same calendar date you signed up. Annual plans are billed once upfront at a 20 % discount. We accept all major credit cards and Apple Pay.</p>
+        </div>
+      </details>
+
+      <details class="faq-item faq-item--extra" data-faq="5" data-track-click="faq-5">
+        <summary class="faq-question">
+          <span>Can I use my membership at any location?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Yes! Your membership is valid at all SparkleWash locations nationwide. Just scan your windshield tag and you're good to go.</p>
+        </div>
+      </details>
+
+      <details class="faq-item faq-item--extra" data-faq="6" data-track-click="faq-6">
+        <summary class="faq-question">
+          <span>What if it rains right after my wash?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>With unlimited washes, just come back! No charge, no hassle. That's the beauty of a membership — wash as often as the weather demands.</p>
+        </div>
+      </details>
+
+      <details class="faq-item faq-item--extra" data-faq="7" data-track-click="faq-7">
+        <summary class="faq-question">
+          <span>Do you offer a satisfaction guarantee?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Yes — if you're not 100 % happy with a wash, let us know within 24 hours and we'll re-wash your vehicle for free, no questions asked.</p>
+        </div>
+      </details>
+
+      <details class="faq-item faq-item--extra" data-faq="8" data-track-click="faq-8">
+        <summary class="faq-question">
+          <span>Can I upgrade or downgrade my plan?</span>
+          <svg class="faq-chevron" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg>
+        </summary>
+        <div class="faq-answer">
+          <p>Of course. You can switch plans at any time from your online account. Upgrades take effect immediately; downgrades apply at the next billing cycle.</p>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- "View all FAQs" button – visible only in faq-compact-top3 mode (CSS controlled) -->
+    <button class="btn btn--outline faq-view-all" data-track-click="faq-view-all">View All FAQs</button>
+
+    <div class="section-cta">
+      <a href="#pricing" class="btn btn--primary" data-track-click="faq-cta">Ready to Join? View Plans</a>
+    </div>
+  </div>
+</section>

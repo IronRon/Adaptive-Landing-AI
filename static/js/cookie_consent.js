@@ -1,30 +1,28 @@
-// Display logic handled server-side via template flag
-// This script sets a "cookie_consent" flag so popup does not show again.
+// Show cookie consent modal and persist user's choice
 
 document.addEventListener("DOMContentLoaded", () => {
     const modal = document.getElementById("cookie-popup");
     if (!modal) return;
 
-    // block page scroll & interactions
+    // Prevent page scrolling while modal is open
     document.body.classList.add('modal-open');
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // focus management (trap)
+    // Focusable elements inside modal for focus trapping
     const focusable = modal.querySelectorAll('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])');
     const firstFocusable = focusable[0];
     const lastFocusable = focusable[focusable.length - 1];
 
-    // ensure clickable area outside card does not close or interact
+    // Block clicks on overlay so page beneath doesn't react
     modal.addEventListener('click', (e) => {
-        // clicks on overlay should not close modal or interact with page
         if (e.target === modal) {
             e.preventDefault();
             e.stopPropagation();
         }
     });
 
-    // key handling: trap Tab inside modal; ignore Escape to force explicit choice
+    // Keep keyboard focus inside the modal (trap Tab). Ignore Escape.
     modal.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
             if (focusable.length === 0) { e.preventDefault(); return; }
@@ -38,18 +36,20 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Move focus to the primary action
+    // Focus the first actionable control
     firstFocusable?.focus();
 
     const acceptBtn = document.getElementById("accept-cookies");
     const declineBtn = document.getElementById("decline-cookies");
 
+    // Close modal and restore page scrolling
     const closeModal = () => {
         document.body.style.overflow = prevOverflow || '';
         document.body.classList.remove('modal-open');
         modal?.remove();
     };
 
+    // Accept: POST to server, update session id if returned
     acceptBtn?.addEventListener("click", async () => {
         try {
             const res = await fetch("/accept-cookies/", {
@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Decline: just close the modal
     declineBtn?.addEventListener("click", () => {
         closeModal();
     });

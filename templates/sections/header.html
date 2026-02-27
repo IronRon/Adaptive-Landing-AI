@@ -1,0 +1,30 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     HEADER – sticky nav with anchor links
+     ═══════════════════════════════════════════════════════════════ -->
+<header class="site-header" id="site-header" data-track="header">
+  <div class="container header-inner">
+    <a href="#hero" class="logo" data-track-click="logo">
+      <!-- inline SVG sparkle icon -->
+      <svg class="logo-icon" viewBox="0 0 32 32" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M16 2 L18 12 L28 14 L18 16 L16 26 L14 16 L4 14 L14 12Z"/>
+      </svg>
+      <span>SparkleWash</span>
+    </a>
+
+    <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" data-track-click="nav-toggle">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="main-nav" id="main-nav" role="navigation" aria-label="Main navigation">
+      <ul>
+        <li><a href="#services" data-track-click="nav-services">Services</a></li>
+        <li><a href="#pricing" data-track-click="nav-pricing">Pricing</a></li>
+        <li><a href="#testimonials" data-track-click="nav-reviews">Reviews</a></li>
+        <li><a href="#faq" data-track-click="nav-faq">FAQ</a></li>
+        <li><a href="#contact" data-track-click="nav-contact">Contact</a></li>
+        <li><a href="#pricing" class="btn btn--small btn--accent" data-track-click="nav-cta">Join Now</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>

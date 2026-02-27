@@ -1,7 +1,6 @@
+// Track user interactions and send them to /track-interactions/
 
-// Event tracker for landing page
-// Reads session id from <body data-session-id="..."> and sends events to /track-interactions/
-
+// Get a cookie value by name
 function getCookie(name) {
 	const value = `; ${document.cookie}`;
 	const parts = value.split(`; ${name}=`);
@@ -9,10 +8,12 @@ function getCookie(name) {
 	return null;
 }
 
+// Read session id from body[data-session-id]
 let sessionId = document.body && document.body.dataset && document.body.dataset.sessionId ? document.body.dataset.sessionId : null;
 if (sessionId === "None" || sessionId === "null") sessionId = null;
 let events = [];
 
+// Add an event object to the in-memory buffer
 function logEvent(type, element, extraData = {}) {
 	const evt = {
 		event_type: type,
@@ -23,19 +24,19 @@ function logEvent(type, element, extraData = {}) {
 		y: extraData.y ?? null,
 	};
 	events.push(evt);
-	// keep a small cap in memory to avoid unbounded growth
+	// Limit buffer size to avoid unbounded growth
 	if (events.length > 1000) events.shift();
 }
 
+// Log clicks with nearest data-section or id
 document.addEventListener('click', (e) => {
 	try {
-		// determine the section id (data-section or id) for the clicked element
 		let section = 'unknown';
 		if (e.target && e.target.closest) {
 			const secEl = e.target.closest('[data-section]');
 			if (secEl) section = secEl.dataset.section || secEl.id || section;
 		} else {
-			// fallback: walk up the DOM
+			// Fallback DOM walk for older browsers
 			let el = e.target;
 			while (el && el !== document.body) {
 				if (el.dataset && el.dataset.section) { section = el.dataset.section; break; }
@@ -46,7 +47,7 @@ document.addEventListener('click', (e) => {
 	} catch (err) { console.warn('click log error', err); }
 });
 
-// Throttle scroll events to avoid huge volumes
+// Throttled scroll logging to reduce volume
 let lastScrollTime = 0;
 document.addEventListener('scroll', () => {
 	const now = Date.now();
@@ -57,9 +58,9 @@ document.addEventListener('scroll', () => {
 	} catch (err) { console.warn('scroll log error', err); }
 });
 
+// Send events payload to server, prefer fetch with keepalive, fallback to sendBeacon
 function sendEvents(payload) {
 	const csrftoken = getCookie('csrftoken');
-	// Prefer fetch with keepalive so we can include CSRF header
 	if (window.fetch) {
 		try {
 			fetch('/track-interactions/', {
@@ -72,7 +73,7 @@ function sendEvents(payload) {
 				body: payload,
 				keepalive: true,
 			}).catch((e) => {
-				// fallback to sendBeacon
+				// If fetch fails, try sendBeacon
 				if (navigator.sendBeacon) navigator.sendBeacon('/track-interactions/', payload);
 			});
 			return;
@@ -86,13 +87,14 @@ function sendEvents(payload) {
 	}
 }
 
-// Expose API to set session id
+// Allow setting session id from other scripts
 window.setSessionId = function(sid) {
     if (!sid) return;
     sessionId = sid;
     console.log('Session ID set for event tracker:', sessionId);
 };
 
+// On page unload, send any buffered events if we have a session id
 window.addEventListener('beforeunload', () => {
 	sessionId = document.body && document.body.dataset && document.body.dataset.sessionId ? document.body.dataset.sessionId : null;
 	if (sessionId === "None" || sessionId === "null") sessionId = null;

@@ -1,0 +1,46 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Site builder</title>
+  <link rel="stylesheet" href="{% static 'css/builder.css' %}">
+</head>
+<body>
+  <main class="builder-shell">
+    <div class="builder-main">
+      <div class="card">
+        <h1>Landing Page Builder</h1>
+
+        <h2>Create New Landing Page</h2>
+        <form method="POST" action="{% url 'builder_new_page' %}">
+            {% csrf_token %}
+            <label>Name</label>
+            <input type="text" name="name" required>
+            <button class="button button-primary" type="submit">Create</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Your Pages</h2>
+        <ul class="builder-list">
+            {% for p in pages %}
+                <li>
+                    <a href="{% url 'builder_edit_page' p.id %}">{{ p.name }}</a>
+                </li>
+            {% empty %}
+                <li class="placeholder">No pages created yet.</li>
+            {% endfor %}
+        </ul>
+      </div>
+    </div>
+
+    <aside class="builder-side">
+      <div class="card">
+        <p class="builder-note">Use the panel to create and manage landing pages.</p>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>

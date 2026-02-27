@@ -1,0 +1,29 @@
+{% load static %}
+<!-- ═══════════════════════════════════════════════════════════════
+     HERO – headline + CTA
+     Variants: .hero-compact, .hero-cta-emphasis
+     ═══════════════════════════════════════════════════════════════ -->
+<section class="section hero {{ hero_variant|default:'' }}" id="hero" data-section="hero" data-track="hero">
+  <div class="container hero-inner">
+    <h1 class="hero-title">Unlimited Washes.<br class="hide-mobile"> One Simple Membership.</h1>
+    <p class="hero-subtitle">
+      Join <strong>SparkleWash Unlimited</strong> and keep your car showroom-clean every day — rain&nbsp;or&nbsp;shine.
+      No contracts. Cancel&nbsp;anytime.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="#pricing" class="btn btn--primary btn--lg" data-track-click="hero-cta-primary">
+        Join Unlimited Wash Club
+      </a>
+      <a href="#pricing" class="btn btn--outline btn--lg hero-secondary-cta" data-track-click="hero-cta-secondary">
+        Start Free Trial
+      </a>
+    </div>
+
+    <div class="hero-trust">
+      <span>✓ No contract</span>
+      <span>✓ Cancel anytime</span>
+      <span>✓ 100 % satisfaction guarantee</span>
+    </div>
+  </div>
+</section>
