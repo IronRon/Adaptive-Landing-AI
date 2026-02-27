@@ -1,47 +1,153 @@
-# Database models for visitors, sessions, interactions, bandit arms, pages, sections, and AI logs.
+"""
+Database models for the tracking & analytics layer.
+
+Visitor  – long-lived cookie-based identity (UUID).
+Session  – one page-load / browsing session per visitor.
+Event    – every tracked interaction inside a session.
+
+Other models (BanditArm, LandingPage, LandingSection, AIRecommendation)
+support the page builder and future contextual-bandit features.
+"""
 
 from django.db import models
 import uuid
 
-# A site visitor tracked via a cookie UUID
+
+# ---------------------------------------------------------------------------
+# Visitor
+# ---------------------------------------------------------------------------
+
 class Visitor(models.Model):
-    cookie_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    """
+    A unique site visitor identified by a long-lived cookie UUID.
+
+    The cookie (``visitor_id``) is set when the user accepts cookies and
+    persists for one year so we can recognise returning visitors.
+    """
+
+    cookie_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Stored in the visitor_id cookie on the client.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     last_seen = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        ordering = ["-created_at"]
+
     def __str__(self):
-        return str(self.cookie_id)
+        return f"Visitor {self.cookie_id}"
 
 
-# A browsing session belonging to a Visitor
+# ---------------------------------------------------------------------------
+# Session
+# ---------------------------------------------------------------------------
+
 class Session(models.Model):
-    visitor = models.ForeignKey(Visitor, on_delete=models.CASCADE, related_name='sessions')
-    session_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    """
+    A single visit session belonging to a :model:`landing.Visitor`.
+
+    A new session is created every time the visitor loads the landing page
+    (after cookie consent has been given).  Old active sessions are closed
+    automatically when a new one starts.
+    """
+
+    visitor = models.ForeignKey(
+        Visitor,
+        on_delete=models.CASCADE,
+        related_name="sessions",
+    )
+    session_id = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="Passed to the frontend and sent back with every event batch.",
+    )
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
-    user_agent = models.TextField(null=True, blank=True)  # browser info
-    referrer = models.URLField(null=True, blank=True)     # referring URL
+    user_agent = models.TextField(blank=True, default="")
+    referrer = models.URLField(blank=True, default="")
     is_active = models.BooleanField(default=True)
 
-    def __str__(self):
-        return f"{self.visitor.cookie_id} - {self.session_id}"
-
-
-# Stored user interactions (click, scroll, etc.) for analytics and bandit signals
-class Interaction(models.Model):
-    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='interactions')
-    event_type = models.CharField(max_length=50)  # e.g. "click", "scroll"
-    element = models.CharField(max_length=255, null=True, blank=True)  # element identifier or section
-    timestamp = models.DateTimeField(auto_now_add=True)
-    x = models.FloatField(null=True, blank=True)  # optional click X coordinate
-    y = models.FloatField(null=True, blank=True)  # optional click Y coordinate
-    additional_data = models.JSONField(default=dict, blank=True)  # extra event details
+    class Meta:
+        ordering = ["-started_at"]
 
     def __str__(self):
-        return f"{self.event_type} - {self.element}"
+        return f"Session {self.session_id} (visitor {self.visitor.cookie_id})"
 
 
-# Simple bandit arm tracking per section for global scoring
+# ---------------------------------------------------------------------------
+# Event  (was "Interaction" — renamed for clarity)
+# ---------------------------------------------------------------------------
+
+class Event(models.Model):
+    """
+    A single tracked interaction event within a :model:`landing.Session`.
+
+    Commonly-queried fields (``event_type``, ``section``, ``element``,
+    ``is_cta``, ``duration_ms``) are stored as real columns for fast
+    filtering.  Everything else the frontend sends is kept in the
+    ``metadata`` JSONField so nothing is lost.
+
+    Frontend event types
+    --------------------
+    page_view, click, hover, section_view, section_dwell,
+    scroll_depth, time_on_page, form_focus, form_submit
+    """
+
+    session = models.ForeignKey(
+        Session,
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+
+    # --- core fields -------------------------------------------------------
+    event_type = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="E.g. click, hover, section_view, scroll_depth …",
+    )
+    timestamp = models.DateTimeField(
+        help_text="Client-side event timestamp (ISO 8601 from JS Date).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    url = models.CharField(max_length=500, blank=True, default="")
+
+    # --- context fields (nullable — not every event has them) ---------------
+    section = models.CharField(max_length=100, blank=True, default="")
+    element = models.CharField(max_length=255, blank=True, default="")
+    is_cta = models.BooleanField(null=True, default=None)
+    duration_ms = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Duration in ms (hover, section_dwell, time_on_page).",
+    )
+
+    # --- catch-all for extra payload fields ---------------------------------
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="tag, text, depth, seconds, read, form_id, field, referrer …",
+    )
+
+    class Meta:
+        ordering = ["timestamp"]
+        indexes = [
+            models.Index(fields=["session", "event_type"]),
+            models.Index(fields=["section"]),
+        ]
+
+    def __str__(self):
+        label = self.section or self.element or ""
+        return f"{self.event_type} {label}".strip()
+
+
+# ---------------------------------------------------------------------------
+# Bandit arm (global section scoring — used later by contextual bandit)
+# ---------------------------------------------------------------------------
+
 class BanditArm(models.Model):
     section = models.CharField(max_length=50, unique=True)
     pulls = models.IntegerField(default=0)    # times the arm was chosen

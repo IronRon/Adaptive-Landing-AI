@@ -1,16 +1,44 @@
-# Views for landing pages: recommendations, session handling, tracking, and builder endpoints
+"""
+Views for the landing app.
+
+Tracking endpoints
+------------------
+accept_cookies      – POST /accept-cookies/   → create / resume visitor, start session
+track_interactions  – POST /track-interactions/ → store batched frontend events
+
+Page-serving views
+------------------
+demo_landing_page   – static landing page (no DB, no bandit)
+landing_page        – dynamic landing page with AI recommendations
+
+Builder views are unchanged and kept at the bottom of the file.
+"""
+
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 import json
+import logging
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from collections import Counter
 import uuid
-from .models import AIRecommendation, LandingPage, LandingSection, Visitor, Session, Interaction
+
+from .models import (
+    AIRecommendation,
+    LandingPage,
+    LandingSection,
+    Visitor,
+    Session,
+    Event,
+)
 from .bandit import SectionBandit
 from .utils import get_user_section_scores, combine_scores
 from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
+
+logger = logging.getLogger(__name__)
 
 def generate_recommendations(visitor, sections, combined_css, page):
     # Use bandit + user data and call the LLM to produce layout/customizations.
@@ -172,55 +200,179 @@ def landing_page(request):
 
 @csrf_exempt
 def track_interactions(request):
-    # Endpoint to receive posted interaction events from the client and persist them
+    """
+    POST /track-interactions/
+
+    Receive batched interaction events from the frontend tracker and persist
+    them to the database.
+
+    Expected JSON payload::
+
+        {
+            "session_id": "<uuid>",
+            "events": [
+                {
+                    "type": "click",
+                    "ts": "2026-02-27T12:00:00.000Z",
+                    "url": "/",
+                    "section": "hero",
+                    "element": "hero-cta",
+                    "is_cta": true,
+                    "tag": "button",
+                    "text": "Get Started"
+                },
+                ...
+            ]
+        }
+
+    Known fields are stored as real columns; everything else goes into
+    ``Event.metadata`` so the frontend can evolve without backend changes.
+    """
     if request.method != "POST":
-        return JsonResponse({"error": "Invalid method"}, status=405)
-    
+        return JsonResponse({"error": "Only POST is allowed."}, status=405)
+
+    # --- parse body --------------------------------------------------------
     try:
         data = json.loads(request.body)
-    except Exception:
-        return JsonResponse({"error": "Invalid JSON"}, status=400)
-    
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    # --- resolve session ---------------------------------------------------
     session_id = data.get("session_id")
     if not session_id:
-        return JsonResponse({"error": "Missing session_id"}, status=400)
-    
+        return JsonResponse({"error": "Missing session_id."}, status=400)
+
     try:
         session = Session.objects.get(session_id=session_id)
-    except (Session.DoesNotExist, ValidationError, ValueError, TypeError):
-        return JsonResponse({"error": "Invalid session_id"}, status=400)
-    
-    events = data.get("events", [])
-    for e in events:
-        Interaction.objects.create(
-            session=session,
-            event_type=e.get("event_type"),
-            element=e.get("element"),
-            additional_data=e.get("additional_data", {}),
+    except (Session.DoesNotExist, ValidationError, ValueError):
+        return JsonResponse({"error": "Unknown or invalid session_id."}, status=404)
+
+    # --- process events ----------------------------------------------------
+    raw_events = data.get("events", [])
+    if not raw_events:
+        return JsonResponse({"status": "ok", "stored": 0})
+
+    # Fields that map to dedicated Event columns — everything else → metadata
+    COLUMN_FIELDS = {"type", "ts", "url", "section", "element", "is_cta", "duration_ms"}
+
+    events_to_create = []
+    for evt in raw_events:
+        # Collect leftover keys into metadata
+        metadata = {k: v for k, v in evt.items() if k not in COLUMN_FIELDS}
+
+        # Parse the client-side ISO timestamp; fall back to server time
+        ts_raw = evt.get("ts")
+        try:
+            timestamp = parse_datetime(ts_raw) if ts_raw else timezone.now()
+            if timestamp is None:
+                timestamp = timezone.now()
+        except (ValueError, TypeError):
+            timestamp = timezone.now()
+
+        events_to_create.append(
+            Event(
+                session=session,
+                event_type=evt.get("type", "unknown"),
+                timestamp=timestamp,
+                url=evt.get("url", ""),
+                section=evt.get("section") or "",
+                element=evt.get("element") or "",
+                is_cta=evt.get("is_cta"),
+                duration_ms=evt.get("duration_ms"),
+                metadata=metadata,
+            )
         )
 
-    return JsonResponse({"status": "success"})
+    Event.objects.bulk_create(events_to_create)
+    logger.debug("Stored %d events for session %s", len(events_to_create), session_id)
+
+    return JsonResponse({"status": "ok", "stored": len(events_to_create)})
+
+    return JsonResponse({"status": "ok", "stored": len(events_to_create)})
+
+
+# ---------------------------------------------------------------------------
+# Cookie acceptance & session creation
+# ---------------------------------------------------------------------------
 
 @csrf_exempt
 def accept_cookies(request):
-    # Called when user accepts cookie popup:
-    # - create Visitor and Session
-    # - return session_id and set visitor_id cookie
-    # Called by JS only when user accepts the popup
-    visitor = Visitor.objects.create()
-    cookie_id = str(visitor.cookie_id)
+    """
+    POST /accept-cookies/
 
-    # Create a new session
+    Called by the frontend in two situations:
+
+    1. **First visit** — user clicks "Accept Cookies".
+       Creates a new :model:`landing.Visitor` and :model:`landing.Session`,
+       sets the ``visitor_id`` cookie (1-year expiry).
+
+    2. **Return visit** — consent cookie already exists, page just loaded.
+       Finds the existing Visitor (from ``visitor_id`` cookie), closes any
+       stale active sessions, and creates a fresh Session for this page-load.
+
+    Returns JSON::
+
+        {
+            "status":     "accepted",
+            "session_id": "<uuid>",
+            "visitor_id": "<uuid>",
+            "is_new":     true | false
+        }
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST is allowed."}, status=405)
+
+    cookie_id = request.COOKIES.get("visitor_id")
+    is_new = False
+
+    # --- resolve or create visitor -----------------------------------------
+    if cookie_id:
+        try:
+            visitor = Visitor.objects.get(cookie_id=cookie_id)
+            visitor.save()  # triggers auto_now → updates last_seen
+        except (Visitor.DoesNotExist, ValueError):
+            # Cookie held a stale / invalid UUID → treat as new visitor
+            visitor = Visitor.objects.create()
+            is_new = True
+    else:
+        visitor = Visitor.objects.create()
+        is_new = True
+
+    # --- close stale active sessions ---------------------------------------
+    Session.objects.filter(
+        visitor=visitor, is_active=True,
+    ).update(is_active=False, ended_at=timezone.now())
+
+    # --- create a fresh session for this page-load -------------------------
     session = Session.objects.create(
         visitor=visitor,
-        user_agent=request.META.get("HTTP_USER_AGENT", "") or None,
-        referrer=request.META.get("HTTP_REFERER", "") or None
+        user_agent=request.META.get("HTTP_USER_AGENT", ""),
+        referrer=request.META.get("HTTP_REFERER", ""),
     )
 
-    # Return session id so client can start tracking immediately (and set cookie)
-    response = JsonResponse({"status": "accepted", "session_id": str(session.session_id)})
-    # set cookie for future requests;
-    response.set_cookie("visitor_id", cookie_id, max_age=60*60*24*365)
+    logger.info(
+        "accept_cookies: visitor=%s  session=%s  is_new=%s",
+        visitor.cookie_id, session.session_id, is_new,
+    )
+
+    # --- build response with cookie ----------------------------------------
+    response = JsonResponse({
+        "status": "accepted",
+        "session_id": str(session.session_id),
+        "visitor_id": str(visitor.cookie_id),
+        "is_new": is_new,
+    })
+
+    # Persist visitor_id cookie for 1 year
+    response.set_cookie(
+        "visitor_id",
+        str(visitor.cookie_id),
+        max_age=60 * 60 * 24 * 365,   # 1 year
+        httponly=False,                 # JS needs to read it
+        samesite="Lax",
+        path="/",
+    )
+
     return response
 
 

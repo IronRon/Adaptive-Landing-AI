@@ -321,15 +321,16 @@
      10. COOKIE CONSENT
      Shows the cookie modal on every visit unless the user has accepted.
      Accepting sets a persistent cookie sw_cookie_consent=accepted.
-     Declining does nothing — modal reappears next page load.
-     Tracking is only started after consent is given.
+     Declining does nothing - modal reappears next page load.
+     Tracking is only started after consent is given AND the server
+     returns a valid session_id (via POST /accept-cookies/).
      ================================================================ */
   function initCookieConsent() {
     const accepted = document.cookie.includes('sw_cookie_consent=accepted');
     const modal    = $('#cookie-popup');
 
     if (accepted) {
-      // Already consented — remove modal, start tracking
+      // Already consented - remove modal and start tracking
       if (modal) modal.remove();
       startTracking();
       return;
@@ -369,22 +370,15 @@
     const acceptBtn = $('#accept-cookies');
     if (acceptBtn) {
       acceptBtn.addEventListener('click', () => {
-        // Set cookie — 1 year expiry
+        // Set consent cookie - 1 year expiry
         document.cookie = 'sw_cookie_consent=accepted;path=/;max-age=' + (60*60*24*365) + ';SameSite=Lax';
         closeModal();
+        // Call backend to create Visitor + Session, then start tracking
         startTracking();
-
-        // Also call the backend accept-cookies endpoint (creates Visitor + sets visitor_id cookie)
-        const csrfToken = (document.cookie.match(/(^| )csrftoken=([^;]+)/) || [])[2] || '';
-        fetch('/accept-cookies/', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
-        }).catch(() => {});
       });
     }
 
-    // DECLINE — just close modal (no cookie set, so it will reappear on next visit)
+    // DECLINE - just close modal (no cookie set, it will reappear next visit)
     const declineBtn = $('#decline-cookies');
     if (declineBtn) {
       declineBtn.addEventListener('click', () => {
@@ -394,10 +388,36 @@
     }
   }
 
-  /* Helper: start tracking only after cookie consent */
-  function startTracking() {
-    if (window.SparkleTracker && typeof window.SparkleTracker._init === 'function') {
-      window.SparkleTracker._init();
+  /**
+   * Start tracking by calling POST /accept-cookies/ to obtain a
+   * server-created session_id, then initialise SparkleTracker with it.
+   *
+   * This is called:
+   *   - Immediately on page load if consent was previously given.
+   *   - Right after the user clicks "Accept Cookies".
+   *
+   * For new visitors the backend creates a Visitor + Session.
+   * For returning visitors (visitor_id cookie exists) the backend
+   * finds the existing Visitor and creates a fresh Session.
+   */
+  async function startTracking() {
+    try {
+      const csrfToken = (document.cookie.match(/(^| )csrftoken=([^;]+)/) || [])[2] || '';
+      const res = await fetch('/accept-cookies/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+      });
+
+      if (!res.ok) throw new Error('POST /accept-cookies/ returned ' + res.status);
+
+      const data = await res.json();
+
+      if (data.session_id && window.SparkleTracker) {
+        window.SparkleTracker._init(data.session_id);
+      }
+    } catch (err) {
+      console.error('[SparkleWash] Failed to start tracking session:', err);
     }
   }
 
