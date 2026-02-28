@@ -21,8 +21,22 @@ class VisitorAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ("session_id", "visitor", "started_at", "is_active")
-    list_filter = ("is_active",)
+    list_display = (
+        "session_id",
+        "visitor",
+        "started_at",
+        "ended_at",
+        "is_active",
+        "primary_intent",
+        "price_intent_score",
+        "service_intent_score",
+        "trust_intent_score",
+        "cta_clicked",
+        "max_scroll_pct",
+        "engaged_time_ms",
+        "quick_scan_score",
+    )
+    list_filter = ("is_active", "primary_intent", "cta_clicked")
     search_fields = ("session_id", "visitor__cookie_id")
     readonly_fields = ("session_id", "started_at")
 

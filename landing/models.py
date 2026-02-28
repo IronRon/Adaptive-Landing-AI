@@ -52,6 +52,25 @@ class Session(models.Model):
     A new session is created every time the visitor loads the landing page
     (after cookie consent has been given).  Old active sessions are closed
     automatically when a new one starts.
+
+    Intent scores
+    -------------
+    When the session ends (``POST /end-session/``), the backend queries all
+    :model:`landing.Event` rows for this session and computes weighted
+    engagement scores for each intent bucket:
+
+    * **price_intent_score** — dwell + clicks on the *pricing* section.
+    * **service_intent_score** — dwell + clicks on the *services* section.
+    * **trust_intent_score** — dwell + clicks on *testimonials* + *FAQ*.
+    * **quick_scan_score** — 1.0 if the visitor scrolled far but dwelt
+      little, indicating skimming rather than reading.
+    * **primary_intent** — the argmax of the three intent scores (or
+      ``"unknown"`` if none reaches the 0.2 threshold).
+
+    These scores are persisted on the Session row so downstream consumers
+    (bandit, analytics dashboard) can query them cheaply without replaying
+    raw events.  See :func:`landing.utils.compute_session_intent_scores`
+    for the full formula.
     """
 
     visitor = models.ForeignKey(
@@ -71,8 +90,54 @@ class Session(models.Model):
     referrer = models.URLField(blank=True, default="")
     is_active = models.BooleanField(default=True)
 
+    # --- engagement aggregates (computed at session end) --------------------
+    max_scroll_pct = models.IntegerField(
+        default=0,
+        help_text="Highest scroll-depth percentage reached during the session.",
+    )
+    engaged_time_ms = models.IntegerField(
+        default=0,
+        help_text="Total active time on page in milliseconds.",
+    )
+    cta_clicked = models.BooleanField(
+        default=False,
+        help_text="True if the visitor clicked any CTA element.",
+    )
+    conversion = models.BooleanField(
+        default=False,
+        help_text="Placeholder for future conversion tracking.",
+    )
+
+    # --- intent scores (0.0 – 1.0, computed from Event rows) ---------------
+    price_intent_score = models.FloatField(
+        default=0.0,
+        help_text="Weighted score reflecting engagement with the pricing section.",
+    )
+    service_intent_score = models.FloatField(
+        default=0.0,
+        help_text="Weighted score reflecting engagement with the services section.",
+    )
+    trust_intent_score = models.FloatField(
+        default=0.0,
+        help_text="Weighted score reflecting engagement with testimonials + FAQ.",
+    )
+    quick_scan_score = models.FloatField(
+        default=0.0,
+        help_text="1.0 if user scrolled far but dwelt little; 0.0 otherwise.",
+    )
+    primary_intent = models.CharField(
+        max_length=32,
+        default="unknown",
+        help_text='Dominant intent bucket: "price", "service", "trust", or "unknown".',
+    )
+
     class Meta:
         ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["ended_at"]),
+            models.Index(fields=["is_active"]),
+            models.Index(fields=["primary_intent"]),
+        ]
 
     def __str__(self):
         return f"Session {self.session_id} (visitor {self.visitor.cookie_id})"

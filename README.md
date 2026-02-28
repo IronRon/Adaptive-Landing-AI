@@ -6,9 +6,9 @@ interaction, builds per-user engagement profiles, and will (once the bandit is
 fully wired) automatically adjust section ordering, visibility, and variant
 styling to maximise conversions.
 
-> **Status:** The tracking + database layer and frontend event pipeline are
-> implemented and functional. The contextual bandit algorithm is the next
-> milestone.
+> **Status:** The tracking + database layer, frontend event pipeline, and
+> **per-session intent scoring** are implemented and functional. The contextual
+> bandit algorithm is the next milestone.
 
 ---
 
@@ -57,6 +57,7 @@ testimonials, about, locations, FAQ, contact, footer).
 │                                                         │
 │  ① Accept cookies  ──POST /accept-cookies/──►           │
 │  ② Batch events    ──POST /track-interactions/──►       │
+│  ③ End session     ──POST /end-session/──►              │
 └──────────────────────────────┬──────────────────────────┘
                                │
                                ▼
@@ -66,6 +67,7 @@ testimonials, about, locations, FAQ, contact, footer).
 │  views.py                                               │
 │    ├── accept_cookies()   → Visitor + Session creation   │
 │    ├── track_interactions() → Event bulk_create          │
+│    ├── end_session()      → compute intent scores        │
 │    └── demo_landing_page()  → serves landing_page.html  │
 │                                                         │
 │  models.py                                              │
@@ -75,7 +77,7 @@ testimonials, about, locations, FAQ, contact, footer).
 │    └── BanditArm (global section scoring — future)      │
 │                                                         │
 │  bandit.py       (UCB1 scoring — placeholder)           │
-│  utils.py        (per-user section engagement scores)   │
+│  utils.py        (section scores + intent computation)  │
 └──────────────────────────────┬──────────────────────────┘
                                │
                                ▼
@@ -156,6 +158,54 @@ The tracker **never generates its own session ID** — it requires a server-prov
   can evolve without requiring migrations).
 - Uses `bulk_create` for efficiency.
 
+### Session Intent Scoring (`POST /end-session/`)
+
+When the user leaves the page (tab hidden / window closed), the frontend calls
+`POST /end-session/` via `sendBeacon`. The backend then:
+
+1. Marks the session as ended (`ended_at`, `is_active=False`).
+2. Queries all `Event` rows for that session.
+3. Computes **intent feature scores** and persists them on the `Session` row.
+
+#### Computed fields
+
+| Field | Type | Description |
+|---|---|---|
+| `price_intent_score` | float 0–1 | Weighted engagement with the **pricing** section |
+| `service_intent_score` | float 0–1 | Weighted engagement with the **services** section |
+| `trust_intent_score` | float 0–1 | Weighted engagement with **testimonials + FAQ** |
+| `quick_scan_score` | float 0/1 | 1 if user scrolled ≥ 75 % but total dwell < 5 s |
+| `primary_intent` | string | Dominant bucket: `"price"`, `"service"`, `"trust"`, or `"unknown"` |
+| `max_scroll_pct` | int 0–100 | Deepest scroll-depth milestone reached |
+| `engaged_time_ms` | int | Total active time on the page (ms) |
+| `cta_clicked` | bool | Whether any CTA element was clicked |
+| `conversion` | bool | Placeholder for future conversion tracking |
+
+#### Scoring formula (v1)
+
+```
+dwell_score(section)  = min(total_dwell_ms / 1000, 30) / 30     → 0..1
+click_score(section)  = min(click_count, 5) / 5                  → 0..1
+
+intent_score = 0.6 × dwell_score  +  0.4 × click_score
+
+primary_intent = argmax(price, service, trust)  if max ≥ 0.2
+                 else "unknown"
+
+quick_scan = 1.0  if  scroll ≥ 75%  AND  total_dwell < 5 s
+             else 0.0
+```
+
+The formula is deliberately simple and documented in `utils.py`. It is designed
+to be swapped out for a more sophisticated model (e.g. logistic regression or
+a learned feature extractor) once baseline data has been collected.
+
+#### Security / idempotency
+
+- The endpoint validates that the `session_id` belongs to the `visitor_id`
+  cookie (prevents cross-visitor poisoning).
+- Calling the endpoint multiple times simply recomputes and overwrites scores.
+
 ### Landing Page (Hardcoded)
 
 - `templates/landing/landing_page.html` — the single landing page served at `/demo/`.
@@ -196,6 +246,10 @@ The core personalisation engine. Planned approach:
    - Form submissions
    - Section dwell time (read = True)
    - Scroll depth reaching 75%+
+   - **Per-session intent scores** (`price_intent_score`, `service_intent_score`,
+     `trust_intent_score`, `cta_clicked`, `quick_scan_score`) are already
+     computed at session end and stored on the `Session` row — ready to be used
+     as context features or reward components.
 
 4. **Policy** — contextual bandit (e.g. LinUCB or Thompson Sampling with
    contextual features) selects the page configuration on each visit, observes
@@ -221,7 +275,7 @@ adaptive-landing-ai/
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin registrations
 │   ├── bandit.py               # UCB1 scoring (placeholder)
-│   ├── utils.py                # Scoring utilities
+│   ├── utils.py                # Scoring utilities + intent computation
 │   ├── ai_llm.py               # Legacy: LLM recommendation call
 │   └── migrations/
 ├── static/
@@ -266,13 +320,22 @@ Visitor
   └── last_seen      datetime (auto-updated)
 
 Session
-  ├── visitor         FK → Visitor
-  ├── session_id      UUID (unique, auto-generated)
-  ├── started_at      datetime
-  ├── ended_at        datetime (nullable)
-  ├── user_agent      text
-  ├── referrer        URL
-  └── is_active       boolean
+  ├── visitor                FK → Visitor
+  ├── session_id             UUID (unique, auto-generated)
+  ├── started_at             datetime
+  ├── ended_at               datetime (nullable, indexed)
+  ├── user_agent             text
+  ├── referrer               URL
+  ├── is_active              boolean (indexed)
+  ├── max_scroll_pct         integer   (0–100)
+  ├── engaged_time_ms        integer   (ms)
+  ├── cta_clicked            boolean
+  ├── conversion             boolean   (placeholder)
+  ├── price_intent_score     float     (0–1)
+  ├── service_intent_score   float     (0–1)
+  ├── trust_intent_score     float     (0–1)
+  ├── quick_scan_score       float     (0 or 1)
+  └── primary_intent         char(32)  (indexed)
 
 Event
   ├── session         FK → Session
@@ -313,9 +376,15 @@ Page load → ui.js initCookieConsent()
         └── SparkleTracker._init(session_id)
               ├── Emits page_view event
               ├── Wires click, hover, section, scroll, time, form listeners
-              └── Batch timer every 5s → POST /track-interactions/
-                    → { session_id, events: [...] }
-                    → bulk_create → Event table
+              ├── Batch timer every 5s → POST /track-interactions/
+              │     → { session_id, events: [...] }
+              │     → bulk_create → Event table
+              │
+              └── visibilitychange / beforeunload
+                    ├── flush() → send remaining events
+                    └── endSession() → POST /end-session/
+                          → compute intent scores
+                          → update Session row
 ```
 
 ---
@@ -362,6 +431,7 @@ python manage.py runserver
 | `/admin/`               | Django admin (inspect tracked data)|
 | `POST /accept-cookies/` | Cookie acceptance + session start  |
 | `POST /track-interactions/` | Batched event ingestion        |
+| `POST /end-session/`        | End session + compute intent scores |
 
 ---
 

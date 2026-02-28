@@ -24,6 +24,7 @@ window.SparkleTracker = {
   _init(serverSessionId),  // Start tracking (called by ui.js)
   track(eventType, data),  // Manually enqueue a custom event
   flush(),                 // Force-send the current queue
+  endSession(),            // Flush events then POST /end-session/ (called automatically on unload)
   getSessionId(),          // Returns the active session UUID or null
 };
 ```
@@ -96,6 +97,30 @@ On `fetch` failure the events are pushed **back** onto the queue so they can be 
 
 ---
 
+## End-Session Flow
+
+When the user leaves the page (`visibilitychange → hidden` or `beforeunload`), the tracker performs two actions **in order**:
+
+1. **`flush()`** — sends any remaining queued events to `/track-interactions/`.
+2. **`endSession()`** — sends `{ session_id }` to `/end-session/` via `sendBeacon` (or `fetch` with `keepalive`).
+
+The backend then marks the session as ended and computes intent-feature scores from the recorded events (see [README § Session Intent Scoring](../../README.md#session-intent-scoring-post-end-session)).
+
+`endSession()` is **idempotent** — a guard flag (`_sessionEnded`) prevents it from firing more than once per page lifecycle, even though both `visibilitychange` and `beforeunload` can trigger in quick succession.
+
+```
+visibilitychange / beforeunload
+        │
+        ├── flush()        → POST /track-interactions/  (remaining events)
+        └── endSession()   → POST /end-session/         (compute scores)
+                                ↓
+                           Backend sets ended_at, is_active=False
+                           Computes price/service/trust/quick_scan scores
+                           Saves to Session row
+```
+
+---
+
 ## Configuration
 
 Constants at the top of the IIFE:
@@ -103,6 +128,7 @@ Constants at the top of the IIFE:
 | Key | Default | Description |
 |---|---|---|
 | `endpoint` | `/track-interactions/` | Backend URL that receives the batch POST |
+| `endSessionEndpoint` | `/end-session/` | Backend URL called on page unload to finalise the session |
 | `batchInterval` | `5000` | Milliseconds between periodic flushes |
 | `maxQueueSize` | `50` | Queue size that triggers an immediate flush |
 | `sessionKey` | `sw_session_id` | `sessionStorage` key for the UUID |

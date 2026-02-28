@@ -3,8 +3,9 @@ Views for the landing app.
 
 Tracking endpoints
 ------------------
-accept_cookies      – POST /accept-cookies/   → create / resume visitor, start session
+accept_cookies      – POST /accept-cookies/    → create / resume visitor, start session
 track_interactions  – POST /track-interactions/ → store batched frontend events
+end_session         – POST /end-session/        → mark session ended, compute intent scores
 
 Page-serving views
 ------------------
@@ -34,7 +35,7 @@ from .models import (
     Event,
 )
 from .bandit import SectionBandit
-from .utils import get_user_section_scores, combine_scores
+from .utils import get_user_section_scores, combine_scores, compute_session_intent_scores
 from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
@@ -288,7 +289,86 @@ def track_interactions(request):
 
     return JsonResponse({"status": "ok", "stored": len(events_to_create)})
 
-    return JsonResponse({"status": "ok", "stored": len(events_to_create)})
+
+# ---------------------------------------------------------------------------
+# Session end & intent-score computation
+# ---------------------------------------------------------------------------
+
+@csrf_exempt
+def end_session(request):
+    """
+    POST /end-session/
+
+    Called by the frontend (via sendBeacon) when the user leaves the page.
+    Marks the session as ended and computes intent-feature scores from the
+    Event rows recorded during the session.
+
+    Payload::
+
+        { "session_id": "<uuid>" }
+
+    Idempotent — safe to call more than once for the same session.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST is allowed."}, status=405)
+
+    # --- consent gate ------------------------------------------------------
+    consent = request.COOKIES.get("sw_cookie_consent")
+    if not consent:
+        # Also accept visitor_id cookie as implicit proof of consent
+        if not request.COOKIES.get("visitor_id"):
+            return JsonResponse({"error": "Cookie consent not given."}, status=403)
+
+    # --- parse body --------------------------------------------------------
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON."}, status=400)
+
+    session_id = data.get("session_id")
+    if not session_id:
+        return JsonResponse({"error": "Missing session_id."}, status=400)
+
+    # --- resolve session ---------------------------------------------------
+    try:
+        session = Session.objects.select_related("visitor").get(session_id=session_id)
+    except (Session.DoesNotExist, ValidationError, ValueError):
+        return JsonResponse({"error": "Unknown or invalid session_id."}, status=404)
+
+    # --- ownership check (prevent poisoning) --------------------------------
+    visitor_cookie = request.COOKIES.get("visitor_id")
+    if not visitor_cookie or str(session.visitor.cookie_id) != visitor_cookie:
+        return JsonResponse({"error": "Session does not belong to this visitor."}, status=403)
+
+    # --- mark ended --------------------------------------------------------
+    if not session.ended_at:
+        session.ended_at = timezone.now()
+    session.is_active = False
+
+    # --- compute intent scores from events ---------------------------------
+    scores = compute_session_intent_scores(session)
+
+    session.max_scroll_pct = scores["max_scroll_pct"]
+    session.engaged_time_ms = scores["engaged_time_ms"]
+    session.cta_clicked = scores["cta_clicked"]
+    session.price_intent_score = scores["price_intent_score"]
+    session.service_intent_score = scores["service_intent_score"]
+    session.trust_intent_score = scores["trust_intent_score"]
+    session.quick_scan_score = scores["quick_scan_score"]
+    session.primary_intent = scores["primary_intent"]
+
+    session.save()
+
+    logger.info(
+        "end_session: session=%s  primary_intent=%s  price=%.2f  service=%.2f  trust=%.2f",
+        session.session_id,
+        scores["primary_intent"],
+        scores["price_intent_score"],
+        scores["service_intent_score"],
+        scores["trust_intent_score"],
+    )
+
+    return JsonResponse({"ok": True})
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,7 @@
   /* -- Configuration ---------------------------------------------------- */
   const CONFIG = {
     endpoint:       '/track-interactions/',
+    endSessionEndpoint: '/end-session/',
     batchInterval:  5000,         // ms between periodic flushes
     maxQueueSize:   50,           // flush immediately when queue hits this
     sessionKey:     'sw_session_id',
@@ -398,6 +399,54 @@
     });
   }
 
+  /* ================================================================
+     8. END SESSION
+     Flushes all remaining events, then signals the backend to close
+     the session and compute intent scores.
+     Uses navigator.sendBeacon (fire-and-forget) so it survives
+     page unload; falls back to fetch with keepalive.
+     ================================================================ */
+  var _sessionEnded = false;
+
+  function endSession() {
+    if (!sessionId || _sessionEnded) return;
+    _sessionEnded = true;
+
+    // 1. Flush any remaining queued events first
+    flush();
+
+    // 2. Send end-session signal
+    var body = JSON.stringify({ session_id: sessionId });
+
+    if (CONFIG.debug) {
+      console.log(
+        '%c END-SESSION ',
+        'background:#dc2626;color:#fff;padding:2px 8px;border-radius:3px',
+        'Closing session', sessionId
+      );
+    }
+
+    if (navigator.sendBeacon) {
+      var blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(CONFIG.endSessionEndpoint, blob);
+    } else {
+      fetch(CONFIG.endSessionEndpoint, {
+        method:    'POST',
+        headers:   { 'Content-Type': 'application/json' },
+        body:      body,
+        keepalive: true,
+      }).catch(function () { /* best effort */ });
+    }
+  }
+
+  /* Hook end-session into page lifecycle events */
+  function initEndSessionHooks() {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') endSession();
+    });
+    window.addEventListener('beforeunload', endSession);
+  }
+
   /* -- Public API ------------------------------------------------------- */
   var _initialised = false;
 
@@ -452,12 +501,14 @@
     initTimeOnPage();
     initFormTracking();
     startBatchTimer();
+    initEndSessionHooks();
   }
 
   /* Expose a minimal public API on the window object */
   window.SparkleTracker = {
     track:        track,
     flush:        flush,
+    endSession:   endSession,
     getSessionId: function () { return sessionId; },
     _init:        _init,
   };
