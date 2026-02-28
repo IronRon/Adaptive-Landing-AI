@@ -171,34 +171,60 @@ When the user leaves the page (tab hidden / window closed), the frontend calls
 
 | Field | Type | Description |
 |---|---|---|
-| `price_intent_score` | float 0–1 | Weighted engagement with the **pricing** section |
-| `service_intent_score` | float 0–1 | Weighted engagement with the **services** section |
-| `trust_intent_score` | float 0–1 | Weighted engagement with **testimonials + FAQ** |
+| `price_intent_score` | float 0–1 | Engagement with the **pricing** section |
+| `service_intent_score` | float 0–1 | Engagement with the **services** section |
+| `trust_intent_score` | float 0–1 | Engagement with **testimonials + FAQ + trust bar + about** |
+| `location_intent_score` | float 0–1 | Engagement with the **locations** section |
+| `contact_intent_score` | float 0–1 | Engagement with the **contact** section |
 | `quick_scan_score` | float 0/1 | 1 if user scrolled ≥ 75 % but total dwell < 5 s |
-| `primary_intent` | string | Dominant bucket: `"price"`, `"service"`, `"trust"`, or `"unknown"` |
+| `primary_intent` | string | Dominant bucket: `"price"`, `"service"`, `"trust"`, `"location"`, `"contact"`, or `"unknown"` |
 | `max_scroll_pct` | int 0–100 | Deepest scroll-depth milestone reached |
 | `engaged_time_ms` | int | Total active time on the page (ms) |
 | `cta_clicked` | bool | Whether any CTA element was clicked |
 | `conversion` | bool | Placeholder for future conversion tracking |
 
-#### Scoring formula (v1)
+#### Section → intent mapping
+
+| Intent bucket | Sections included | Rationale |
+|---|---|---|
+| **price** | `pricing` | Plan comparison, price-focused engagement |
+| **service** | `services` | Understanding what’s offered |
+| **trust** | `testimonials`, `faq`, `trust-bar`, `about` | All “can I trust this company?” content — reviews, badges, company story |
+| **location** | `locations` | Checking physical accessibility → serious purchase consideration |
+| **contact** | `contact` | Form engagement, clicking details → direct outreach intent |
+
+**Hero** is excluded — every visitor sees it first so dwell is noise, and its
+CTAs point to `#pricing` which is already tracked. **Header** and **footer**
+carry no meaningful intent signal.
+
+#### Scoring formula (v2)
+
+Each intent bucket collects five per-section signals:
+
+| # | Signal | Normalisation | Half-saturation (k) |
+|---|--------|---------------|---------------------|
+| 1 | Clicks in section | `clicks / (clicks + k)` | 3 clicks |
+| 2 | Hover time (ms) | `hover_ms / (hover_ms + k)` | 5 000 ms |
+| 3 | Section dwell (ms) | `dwell_ms / (dwell_ms + k)` | 15 000 ms |
+| 4 | CTA click | `min(cta_clicks, 1)` (binary) | — |
+| 5 | CTA hover time (ms) | `cta_hover_ms / (cta_hover_ms + k)` | 3 000 ms |
+
+All signals use the saturation function `f(x) = x / (x + k)` which maps
+0 → 0 and approaches 1 for large values — **no hard caps**.
 
 ```
-dwell_score(section)  = min(total_dwell_ms / 1000, 30) / 30     → 0..1
-click_score(section)  = min(click_count, 5) / 5                  → 0..1
+intent_score = mean(click_signal, hover_signal, dwell_signal,
+                    cta_click_signal, cta_hover_signal)      → 0..1
 
-intent_score = 0.6 × dwell_score  +  0.4 × click_score
-
-primary_intent = argmax(price, service, trust)  if max ≥ 0.2
+primary_intent = argmax(price, service, trust, location, contact)  if max ≥ 0.1
                  else "unknown"
 
 quick_scan = 1.0  if  scroll ≥ 75%  AND  total_dwell < 5 s
              else 0.0
 ```
 
-The formula is deliberately simple and documented in `utils.py`. It is designed
-to be swapped out for a more sophisticated model (e.g. logistic regression or
-a learned feature extractor) once baseline data has been collected.
+Signals are combined with **equal weights** — no manual tuning until real
+data is available to learn better coefficients.
 
 #### Security / idempotency
 
@@ -334,6 +360,8 @@ Session
   ├── price_intent_score     float     (0–1)
   ├── service_intent_score   float     (0–1)
   ├── trust_intent_score     float     (0–1)
+  ├── location_intent_score  float     (0–1)
+  ├── contact_intent_score   float     (0–1)
   ├── quick_scan_score       float     (0 or 1)
   └── primary_intent         char(32)  (indexed)
 

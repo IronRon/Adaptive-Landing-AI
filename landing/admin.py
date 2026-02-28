@@ -31,6 +31,8 @@ class SessionAdmin(admin.ModelAdmin):
         "price_intent_score",
         "service_intent_score",
         "trust_intent_score",
+        "location_intent_score",
+        "contact_intent_score",
         "cta_clicked",
         "max_scroll_pct",
         "engaged_time_ms",

@@ -56,16 +56,31 @@ class Session(models.Model):
     Intent scores
     -------------
     When the session ends (``POST /end-session/``), the backend queries all
-    :model:`landing.Event` rows for this session and computes weighted
-    engagement scores for each intent bucket:
+    :model:`landing.Event` rows for this session and computes engagement
+    scores for each intent bucket from five per-section signals:
 
-    * **price_intent_score** — dwell + clicks on the *pricing* section.
-    * **service_intent_score** — dwell + clicks on the *services* section.
-    * **trust_intent_score** — dwell + clicks on *testimonials* + *FAQ*.
+    1. **Clicks** in the section.
+    2. **Hover time** on interactive elements in the section.
+    3. **Dwell time** (how long the section was in the viewport).
+    4. **CTA click** (binary — did they click a CTA in the section?).
+    5. **CTA hover time** on CTA elements in the section.
+
+    Each signal is normalised to 0..1 via a saturation function
+    ``f(x) = x / (x + k)`` (no hard caps), and the five signals are
+    averaged with **equal weights** to produce the intent score.
+
+    * **price_intent_score** — engagement with the *pricing* section.
+    * **service_intent_score** — engagement with the *services* section.
+    * **trust_intent_score** — engagement with *testimonials* + *FAQ* +
+      *trust bar* + *about* (all “can I trust this company?” content).
+    * **location_intent_score** — engagement with the *locations* section
+      (checking physical accessibility → serious purchase consideration).
+    * **contact_intent_score** — engagement with the *contact* section
+      (form focus/submit, clicking contact details → direct outreach intent).
     * **quick_scan_score** — 1.0 if the visitor scrolled far but dwelt
       little, indicating skimming rather than reading.
-    * **primary_intent** — the argmax of the three intent scores (or
-      ``"unknown"`` if none reaches the 0.2 threshold).
+    * **primary_intent** — the argmax of the five intent scores (or
+      ``"unknown"`` if none reaches the 0.1 threshold).
 
     These scores are persisted on the Session row so downstream consumers
     (bandit, analytics dashboard) can query them cheaply without replaying
@@ -119,7 +134,15 @@ class Session(models.Model):
     )
     trust_intent_score = models.FloatField(
         default=0.0,
-        help_text="Weighted score reflecting engagement with testimonials + FAQ.",
+        help_text="Weighted score reflecting engagement with testimonials, FAQ, trust bar, and about.",
+    )
+    location_intent_score = models.FloatField(
+        default=0.0,
+        help_text="Weighted score reflecting engagement with the locations section.",
+    )
+    contact_intent_score = models.FloatField(
+        default=0.0,
+        help_text="Weighted score reflecting engagement with the contact section.",
     )
     quick_scan_score = models.FloatField(
         default=0.0,
@@ -128,7 +151,7 @@ class Session(models.Model):
     primary_intent = models.CharField(
         max_length=32,
         default="unknown",
-        help_text='Dominant intent bucket: "price", "service", "trust", or "unknown".',
+        help_text='Dominant intent bucket: "price", "service", "trust", "location", "contact", or "unknown".',
     )
 
     class Meta:

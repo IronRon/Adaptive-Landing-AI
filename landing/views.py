@@ -354,18 +354,23 @@ def end_session(request):
     session.price_intent_score = scores["price_intent_score"]
     session.service_intent_score = scores["service_intent_score"]
     session.trust_intent_score = scores["trust_intent_score"]
+    session.location_intent_score = scores["location_intent_score"]
+    session.contact_intent_score = scores["contact_intent_score"]
     session.quick_scan_score = scores["quick_scan_score"]
     session.primary_intent = scores["primary_intent"]
 
     session.save()
 
     logger.info(
-        "end_session: session=%s  primary_intent=%s  price=%.2f  service=%.2f  trust=%.2f",
+        "end_session: session=%s  primary_intent=%s  "
+        "price=%.2f  service=%.2f  trust=%.2f  location=%.2f  contact=%.2f",
         session.session_id,
         scores["primary_intent"],
         scores["price_intent_score"],
         scores["service_intent_score"],
         scores["trust_intent_score"],
+        scores["location_intent_score"],
+        scores["contact_intent_score"],
     )
 
     return JsonResponse({"ok": True})
