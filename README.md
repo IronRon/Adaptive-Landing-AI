@@ -2,13 +2,13 @@
 
 A Django-based system that **personalises a landing page in real time** using a
 contextual multi-armed bandit algorithm. The system tracks every visitor
-interaction, builds per-user engagement profiles, and will (once the bandit is
-fully wired) automatically adjust section ordering, visibility, and variant
-styling to maximise conversions.
+interaction, builds per-user engagement profiles, and automatically adjusts
+section visibility, compactness, and variant styling to maximise conversions.
 
-> **Status:** The tracking + database layer, frontend event pipeline, and
-> **per-session intent scoring** are implemented and functional. The contextual
-> bandit algorithm is the next milestone.
+> **Status:** Tracking, per-session intent scoring, and a **v1 contextual
+> multi-armed bandit** (epsilon-greedy, bucketised context) are implemented and
+> functional. The bandit runs for returning visitors (visit ≥ 2) and records
+> decisions + rewards end-to-end. See [BANDIT.md](BANDIT.md) for full details.
 
 ---
 
@@ -71,12 +71,14 @@ testimonials, about, locations, FAQ, contact, footer).
 │    └── demo_landing_page()  → serves landing_page.html  │
 │                                                         │
 │  models.py                                              │
-│    ├── Visitor   (cookie-based identity)                │
-│    ├── Session   (one per page-load)                    │
-│    ├── Event     (every tracked interaction)            │
-│    └── BanditArm (global section scoring — future)      │
+│    ├── Visitor       (cookie-based identity)            │
+│    ├── Session       (one per page-load, visit_number)  │
+│    ├── Event         (every tracked interaction)        │
+│    ├── BanditArm     (page config per arm)              │
+│    ├── BanditDecision(1:1 with session, logs choice)    │
+│    └── BanditArmStat (per-bucket mean reward cache)     │
 │                                                         │
-│  bandit.py       (UCB1 scoring — placeholder)           │
+│  bandit_utils.py (context → bucket → choose arm)        │
 │  utils.py        (section scores + intent computation)  │
 └──────────────────────────────┬──────────────────────────┘
                                │
@@ -86,7 +88,8 @@ testimonials, about, locations, FAQ, contact, footer).
 │                                                         │
 │  landing_visitor  ──1:N──  landing_session               │
 │  landing_session  ──1:N──  landing_event                 │
-│  landing_banditarm                                       │
+│  landing_session  ──1:1──  landing_banditdecision        │
+│  landing_banditarm ──1:N── landing_banditarmstat         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -100,7 +103,7 @@ testimonials, about, locations, FAQ, contact, footer).
 | Database    | PostgreSQL (via psycopg2-binary)         |
 | Frontend    | Vanilla JS, Django templates, CSS       |
 | Tracking    | Custom event pipeline (tracking.js)     |
-| AI (future) | Contextual multi-armed bandit (Python)  |
+| AI          | Contextual multi-armed bandit (epsilon-greedy, Python) |
 
 ---
 
@@ -242,47 +245,66 @@ data is available to learn better coefficients.
 - `ui.js` handles all interactive UI (carousel, pricing toggle, FAQ accordion,
   smooth scroll, section variant helpers, cookie consent flow).
 
+### Contextual Multi-Armed Bandit (v1)
+
+The bandit system is live and runs **for returning visitors** (visit ≥ 2). First
+visits collect tracking data only.
+
+- **Arms** — each `BanditArm` row holds a `page_config` JSON dict consumed by
+  `applyPageConfig()` on the frontend (compact flags, hide/promote sections,
+  variant overrides). Six starter arms are seeded via
+  `python manage.py seed_bandit_arms`.
+- **Context** — `build_context()` extracts `device_type` (mobile / desktop) and
+  `last_primary_intent` from the visitor's most recent session. `bucketize()`
+  combines them into a string key, e.g. `"mobile_price"`, giving up to ~12
+  buckets.
+- **Policy** — epsilon-greedy (ε = 0.10) with a warmup phase. Arms with fewer
+  than `MIN_TRIES_PER_ARM` (5) pulls in the current bucket are pulled first.
+  After warmup, with probability ε a random arm is chosen (explore); otherwise
+  the arm with the highest `mean_reward` for that bucket is chosen (exploit).
+- **Reward** — binary: 1.0 if `cta_clicked` during the session, else 0.0.
+  Recorded when `end_session` fires.
+- **Decision logging** — every bandit choice is persisted in `BanditDecision`
+  (1:1 with `Session`), recording the bucket, arm, epsilon, explore flag, and
+  eventual reward.
+- **Stats cache** — `BanditArmStat` stores per-bucket per-arm `n`,
+  `sum_reward`, and `mean_reward` so the policy can query without scanning all
+  decisions.
+
+Full details: [BANDIT.md](BANDIT.md)
+
 ### Django Admin
 
-All tracking models (`Visitor`, `Session`, `Event`, `BanditArm`) are registered
-in the admin with appropriate `list_display`, `list_filter`, and
-`search_fields` for easy debugging and data inspection.
+All models (`Visitor`, `Session`, `Event`, `BanditArm`, `BanditDecision`,
+`BanditArmStat`) are registered in the admin with appropriate `list_display`,
+`list_filter`, and `search_fields` for easy debugging and data inspection.
 
 ---
 
 ## What Is Next
 
-### Contextual Multi-Armed Bandit Algorithm
+### Combinatorial Contextual Multi-Armed Bandit
 
-The core personalisation engine. Planned approach:
+The current v1 treats each arm as a **fixed, hand-crafted page configuration**.
+Planned improvements:
 
-1. **Arms** — each "arm" is a page configuration (section order, variant
-   classes, promoted/hidden sections). The existing `BanditArm` model and
-   `ui.js` variant helpers (`setVariant`, `toggleCompact`, `hideSection`,
-   `promoteSection`, `applyPageConfig`) are already in place.
+1. **Combinatorial arms** — instead of choosing one of N pre-defined configs,
+   the bandit will compose a page layout by making independent per-section
+   decisions (e.g. compact vs. full for each section, which sections to promote
+   or hide). This dramatically expands the configuration space without
+   requiring every combination to be manually defined.
 
-2. **Context** — per-visitor features derived from tracked data:
-   - New vs. returning visitor, session count
-   - Referrer / traffic source
-   - Device type (from user-agent)
-   - Historical section engagement scores (from `utils.get_user_section_scores`)
+2. **Linear-regression context model** — replace the current bucketed
+   mean-reward lookup with a linear model (e.g. LinUCB / ridge regression) that
+   takes a continuous feature vector as context. This removes the need for
+   discrete buckets and enables generalisation across similar visitors.
 
-3. **Reward signal** — derived from events:
-   - CTA clicks (`is_cta=True`)
-   - Form submissions
-   - Section dwell time (read = True)
-   - Scroll depth reaching 75%+
-   - **Per-session intent scores** (`price_intent_score`, `service_intent_score`,
-     `trust_intent_score`, `cta_clicked`, `quick_scan_score`) are already
-     computed at session end and stored on the `Session` row — ready to be used
-     as context features or reward components.
+3. **Richer reward signal** — extend beyond the binary CTA-click reward to
+   incorporate scroll depth, section dwell, and intent scores as a composite
+   reward.
 
-4. **Policy** — contextual bandit (e.g. LinUCB or Thompson Sampling with
-   contextual features) selects the page configuration on each visit, observes
-   the reward, and updates its model.
-
-5. **Decision table** — a new model to log which configuration was shown to
-   which visitor and the resulting reward, closing the feedback loop.
+4. **Warm-start from collected data** — once enough v1 decisions have been
+   logged, use them to bootstrap the regression model before switching over.
 
 ---
 
@@ -296,13 +318,14 @@ adaptive-landing-ai/
 │   ├── urls.py
 │   └── wsgi.py
 ├── landing/                    # Main application
-│   ├── models.py               # Visitor, Session, Event, BanditArm, ...
+│   ├── models.py               # Visitor, Session, Event, BanditArm, BanditDecision, ...
 │   ├── views.py                # Endpoints + page views
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin registrations
-│   ├── bandit.py               # UCB1 scoring (placeholder)
+│   ├── bandit_utils.py         # Context → bucket → choose arm → update stats
 │   ├── utils.py                # Scoring utilities + intent computation
 │   ├── ai_llm.py               # Legacy: LLM recommendation call
+│   ├── management/commands/seed_bandit_arms.py  # Seed starter arms
 │   └── migrations/
 ├── static/
 │   ├── landing/
@@ -348,6 +371,7 @@ Visitor
 Session
   ├── visitor                FK → Visitor
   ├── session_id             UUID (unique, auto-generated)
+  ├── visit_number           integer   (1 = first visit, 2+ = returning)
   ├── started_at             datetime
   ├── ended_at               datetime (nullable, indexed)
   ├── user_agent             text
@@ -378,9 +402,39 @@ Event
   └── metadata        JSON     (catch-all)
 ```
 
-### Other Models (legacy / future)
+### Bandit Models (active)
 
-- `BanditArm` — global per-section pull count and reward (future bandit use).
+```
+BanditArm
+  ├── arm_id          char(100)  (unique, machine-readable key)
+  ├── name            char(255)  (human label)
+  ├── page_config     JSON       (consumed by applyPageConfig on frontend)
+  ├── is_active       boolean    (inactive arms excluded from selection)
+  └── created_at      datetime
+
+BanditDecision  (one per session where bandit ran)
+  ├── session         1:1 → Session
+  ├── visitor         FK → Visitor
+  ├── context_bucket  char(100)  (e.g. "mobile_price")
+  ├── context_json    JSON       (full context snapshot)
+  ├── arm             FK → BanditArm
+  ├── explore         boolean
+  ├── epsilon         float
+  ├── reward          float      (nullable, filled at session end)
+  └── created_at      datetime
+
+BanditArmStat  (per-bucket per-arm cache)
+  ├── context_bucket  char(100)
+  ├── arm             FK → BanditArm
+  ├── n               int        (pull count)
+  ├── sum_reward      float
+  ├── mean_reward     float      (sum_reward / n)
+  └── updated_at      datetime
+  UNIQUE (context_bucket, arm)
+```
+
+### Other Models (legacy)
+
 - `LandingPage` / `LandingSection` — legacy page builder (not actively used).
 - `AIRecommendation` — legacy LLM response log.
 
@@ -399,7 +453,13 @@ Page load → ui.js initCookieConsent()
         ├── POST /accept-cookies/
         │     → backend creates/finds Visitor + new Session
         │     → Set-Cookie: visitor_id=<uuid> (1 year)
-        │     → returns { session_id }
+        │     → computes visit_number
+        │     → IF visit ≥ 2: bandit selects arm for context bucket
+        │       → saves BanditDecision
+        │     → returns { session_id, visit_number, arm_id, page_config }
+        │
+        ├── ui.js applyPageConfig(page_config)
+        │     → applies compact / hide / promote / variant changes to DOM
         │
         └── SparkleTracker._init(session_id)
               ├── Emits page_view event
@@ -412,6 +472,7 @@ Page load → ui.js initCookieConsent()
                     ├── flush() → send remaining events
                     └── endSession() → POST /end-session/
                           → compute intent scores
+                          → IF visit ≥ 2: compute reward, update BanditArmStat
                           → update Session row
 ```
 
@@ -476,7 +537,6 @@ the current implementation:
 | File / Directory             | Purpose (legacy)                                |
 | ---------------------------- | ----------------------------------------------- |
 | `landing/ai_llm.py`         | OpenAI API call to generate LLM recommendations |
-| `landing/bandit.py`         | Simple UCB1 bandit (global, non-contextual)      |
 | `templates/builder/`        | Page builder UI templates                        |
 | `templates/landing/index_dynamic.html` | Dynamic page rendered from DB sections |
 | `static/js/cookie_consent.js` | Old cookie consent handler (replaced by `ui.js`) |
@@ -485,4 +545,4 @@ the current implementation:
 | `LandingPage` / `LandingSection` models | DB-driven page/section storage      |
 | `AIRecommendation` model    | Logged LLM responses                             |
 
-These will be cleaned up or repurposed as the contextual bandit is implemented.
+These may be cleaned up or repurposed in future iterations.
