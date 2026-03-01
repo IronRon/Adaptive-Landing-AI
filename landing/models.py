@@ -104,6 +104,10 @@ class Session(models.Model):
     user_agent = models.TextField(blank=True, default="")
     referrer = models.URLField(blank=True, default="")
     is_active = models.BooleanField(default=True)
+    visit_number = models.IntegerField(
+        default=1,
+        help_text="Which visit this is for the visitor (1 = first, 2 = second, …).",
+    )
 
     # --- engagement aggregates (computed at session end) --------------------
     max_scroll_pct = models.IntegerField(
@@ -232,18 +236,6 @@ class Event(models.Model):
         return f"{self.event_type} {label}".strip()
 
 
-# ---------------------------------------------------------------------------
-# Bandit arm (global section scoring — used later by contextual bandit)
-# ---------------------------------------------------------------------------
-
-class BanditArm(models.Model):
-    section = models.CharField(max_length=50, unique=True)
-    pulls = models.IntegerField(default=0)    # times the arm was chosen
-    reward = models.FloatField(default=0.0)   # cumulative reward
-
-    def __str__(self):
-        return f"{self.section}: pulls={self.pulls}, reward={self.reward}"
-    
 # Landing page container with optional global CSS
 class LandingPage(models.Model):
     name = models.CharField(max_length=255)
@@ -275,3 +267,149 @@ class AIRecommendation(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     response_json = models.JSONField()
+
+
+# ---------------------------------------------------------------------------
+# Contextual bandit models
+# ---------------------------------------------------------------------------
+
+class BanditArm(models.Model):
+    """
+    A single bandit arm representing a page-layout variant.
+
+    ``page_config`` is the JSON blob passed to the frontend's
+    ``applyPageConfig()`` function.  Shape::
+
+        {
+            "compact": ["services"],
+            "hide": [],
+            "promote": "pricing",
+            "variants": {"pricing": "highlight-plan-2"}
+        }
+    """
+
+    arm_id = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text='Machine-readable key, e.g. "pricing_highlight_plan_2".',
+    )
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional human-readable label.",
+    )
+    page_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Config dict consumed by applyPageConfig on the frontend.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Inactive arms are excluded from selection.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["arm_id"]
+
+    def __str__(self):
+        return self.arm_id
+
+
+class BanditDecision(models.Model):
+    """
+    Records the bandit's choice for a single session.
+
+    Only created for sessions where the bandit actually ran
+    (visit_number >= 2).
+    """
+
+    session = models.OneToOneField(
+        Session,
+        on_delete=models.CASCADE,
+        related_name="bandit_decision",
+    )
+    visitor = models.ForeignKey(
+        Visitor,
+        on_delete=models.CASCADE,
+        related_name="bandit_decisions",
+    )
+    context_bucket = models.CharField(
+        max_length=100,
+        db_index=True,
+        help_text='E.g. "mobile_price", "desktop_unknown".',
+    )
+    context_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Full context snapshot used when making the decision.",
+    )
+    arm = models.ForeignKey(
+        BanditArm,
+        on_delete=models.CASCADE,
+        related_name="decisions",
+    )
+    explore = models.BooleanField(
+        help_text="True if this was an exploration pick (random).",
+    )
+    epsilon = models.FloatField(
+        help_text="Epsilon value at decision time.",
+    )
+    reward = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Filled in when the session ends (1.0 if CTA clicked, else 0.0).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["context_bucket"]),
+        ]
+
+    def __str__(self):
+        return f"Decision session={self.session_id} arm={self.arm.arm_id}"
+
+
+class BanditArmStat(models.Model):
+    """
+    Running statistics for a (context_bucket, arm) pair.
+
+    Updated incrementally each time a reward is observed.
+    """
+
+    context_bucket = models.CharField(max_length=100, db_index=True)
+    arm = models.ForeignKey(
+        BanditArm,
+        on_delete=models.CASCADE,
+        related_name="stats",
+    )
+    n = models.IntegerField(
+        default=0,
+        help_text="Number of times this arm was pulled in this bucket.",
+    )
+    sum_reward = models.FloatField(
+        default=0.0,
+        help_text="Cumulative reward for this arm in this bucket.",
+    )
+    mean_reward = models.FloatField(
+        default=0.0,
+        help_text="sum_reward / n  (cached for fast lookup).",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["context_bucket", "arm"],
+                name="unique_bucket_arm",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["context_bucket", "arm"]),
+        ]
+
+    def __str__(self):
+        return f"Stat bucket={self.context_bucket} arm={self.arm.arm_id} n={self.n} mean={self.mean_reward:.3f}"

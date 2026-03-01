@@ -34,10 +34,12 @@ from .models import (
     Session,
     Event,
 )
-from .bandit import SectionBandit
 from .utils import get_user_section_scores, combine_scores, compute_session_intent_scores
 from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
+
+from .models import BanditArm, BanditDecision
+from .bandit_utils import build_context, bucketize, choose_arm, update_stats
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +55,8 @@ def generate_recommendations(visitor, sections, combined_css, page):
         for sec in sections
     }
 
-    # 2. Global scores from bandit
-    bandit = SectionBandit()
-    global_scores = bandit.get_global_scores()
+    # 2. Global scores (placeholder — old UCB1 bandit removed)
+    global_scores = {sec.key: 1.0 for sec in sections}
 
     # 3. Personal scores
     user_scores = get_user_section_scores(visitor)
@@ -361,6 +362,23 @@ def end_session(request):
 
     session.save()
 
+    # --- bandit reward update (only for visit_number >= 2) -----------------
+    if session.visit_number >= 2:
+        try:
+            decision = BanditDecision.objects.select_related("arm").get(session=session)
+            reward = 1.0 if session.cta_clicked else 0.0
+            decision.reward = reward
+            decision.save(update_fields=["reward"])
+            update_stats(decision.context_bucket, decision.arm, reward)
+            logger.info(
+                "Bandit reward: session=%s arm=%s reward=%.1f",
+                session.session_id, decision.arm.arm_id, reward,
+            )
+        except BanditDecision.DoesNotExist:
+            logger.debug("No BanditDecision for session %s — skipping reward.", session.session_id)
+        except Exception:
+            logger.exception("Bandit reward update failed for session %s.", session.session_id)
+
     logger.info(
         "end_session: session=%s  primary_intent=%s  "
         "price=%.2f  service=%.2f  trust=%.2f  location=%.2f  contact=%.2f",
@@ -428,17 +446,51 @@ def accept_cookies(request):
         visitor=visitor, is_active=True,
     ).update(is_active=False, ended_at=timezone.now())
 
+    # --- compute visit_number ----------------------------------------------
+    visit_number = Session.objects.filter(visitor=visitor).count() + 1
+
     # --- create a fresh session for this page-load -------------------------
     session = Session.objects.create(
         visitor=visitor,
         user_agent=request.META.get("HTTP_USER_AGENT", ""),
         referrer=request.META.get("HTTP_REFERER", ""),
+        visit_number=visit_number,
     )
 
     logger.info(
-        "accept_cookies: visitor=%s  session=%s  is_new=%s",
-        visitor.cookie_id, session.session_id, is_new,
+        "accept_cookies: visitor=%s  session=%s  is_new=%s  visit_number=%d",
+        visitor.cookie_id, session.session_id, is_new, visit_number,
     )
+
+    # --- contextual bandit -------------------------------------------------
+    page_config = {}   # default: no layout changes (control)
+    arm_id = None
+
+    if visit_number >= 2:
+        try:
+            context = build_context(visitor, request)
+            bucket = bucketize(context)
+            arm, explored = choose_arm(bucket)
+
+            from .bandit_utils import EPSILON as _eps
+            BanditDecision.objects.create(
+                session=session,
+                visitor=visitor,
+                context_bucket=bucket,
+                context_json=context,
+                arm=arm,
+                explore=explored,
+                epsilon=_eps,
+            )
+
+            page_config = arm.page_config or {}
+            arm_id = arm.arm_id
+            logger.info(
+                "Bandit chose arm=%s for bucket=%s (explore=%s)",
+                arm.arm_id, bucket, explored,
+            )
+        except Exception:
+            logger.exception("Bandit decision failed — falling back to control.")
 
     # --- build response with cookie ----------------------------------------
     response = JsonResponse({
@@ -446,6 +498,9 @@ def accept_cookies(request):
         "session_id": str(session.session_id),
         "visitor_id": str(visitor.cookie_id),
         "is_new": is_new,
+        "visit_number": visit_number,
+        "arm_id": arm_id,
+        "page_config": page_config,
     })
 
     # Persist visitor_id cookie for 1 year

@@ -4,6 +4,8 @@ from django.contrib import admin
 
 from .models import (
     BanditArm,
+    BanditArmStat,
+    BanditDecision,
     Event,
     LandingPage,
     LandingSection,
@@ -24,6 +26,7 @@ class SessionAdmin(admin.ModelAdmin):
     list_display = (
         "session_id",
         "visitor",
+        "visit_number",
         "started_at",
         "ended_at",
         "is_active",
@@ -53,7 +56,35 @@ class EventAdmin(admin.ModelAdmin):
 
 @admin.register(BanditArm)
 class BanditArmAdmin(admin.ModelAdmin):
-    list_display = ("section", "pulls", "reward")
+    list_display = ("arm_id", "name", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("arm_id", "name")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(BanditDecision)
+class BanditDecisionAdmin(admin.ModelAdmin):
+    list_display = (
+        "session",
+        "visitor",
+        "context_bucket",
+        "arm",
+        "explore",
+        "epsilon",
+        "reward",
+        "created_at",
+    )
+    list_filter = ("explore", "context_bucket")
+    search_fields = ("session__session_id", "visitor__cookie_id", "arm__arm_id")
+    readonly_fields = ("created_at",)
+
+
+@admin.register(BanditArmStat)
+class BanditArmStatAdmin(admin.ModelAdmin):
+    list_display = ("context_bucket", "arm", "n", "sum_reward", "mean_reward", "updated_at")
+    list_filter = ("context_bucket",)
+    search_fields = ("context_bucket", "arm__arm_id")
+    readonly_fields = ("updated_at",)
 
 
 @admin.register(LandingPage)
