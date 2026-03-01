@@ -401,20 +401,32 @@
    * finds the existing Visitor and creates a fresh Session.
    */
   async function startTracking() {
+    console.log('Attempting to start tracking session');
     try {
+      console.log('Checking cookie consent with backend...');
       const csrfToken = (document.cookie.match(/(^| )csrftoken=([^;]+)/) || [])[2] || '';
       const res = await fetch('/accept-cookies/', {
         method: 'POST',
         credentials: 'same-origin',
         headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
       });
+      console.log('Received response from /accept-cookies/:', res);
 
       if (!res.ok) throw new Error('POST /accept-cookies/ returned ' + res.status);
 
       const data = await res.json();
+      console.log('bandit page_config check:', data);
 
       if (data.session_id && window.SparkleTracker) {
         window.SparkleTracker._init(data.session_id);
+      }
+
+      
+
+      // Apply bandit-chosen page config for returning visitors
+      if (data.page_config && Object.keys(data.page_config).length > 0) {
+        console.log('[SparkleWash] Applying bandit page_config:', data.page_config);
+        window.applyPageConfig(data.page_config);
       }
     } catch (err) {
       console.error('[SparkleWash] Failed to start tracking session:', err);

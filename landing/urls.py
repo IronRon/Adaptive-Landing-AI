@@ -15,6 +15,7 @@ urlpatterns = [
     path('builder/section/<int:section_id>/delete/', views.builder_delete_section, name='builder_delete_section'),
 
     path('track-interactions/', views.track_interactions, name='track_interactions'),
+    path('end-session/', views.end_session, name='end_session'),
     path('accept-cookies/', views.accept_cookies, name='accept_cookies'),
 
     # Demo landing page (hard-coded, no DB needed)
