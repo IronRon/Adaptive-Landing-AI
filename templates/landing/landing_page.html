@@ -4,11 +4,11 @@
 {% block title %}SparkleWash – Unlimited Car Wash Memberships{% endblock %}
 
 {% block body %}
-{# ──────────────────────────────────────────────────────────────
+<!-- {# ──────────────────────────────────────────────────────────────
    COOKIE CONSENT MODAL
    Shown on every visit until the user clicks "Accept".
    Declining keeps the modal on every page load.
-   ────────────────────────────────────────────────────────────── #}
+   ────────────────────────────────────────────────────────────── #} -->
 <div id="cookie-popup" class="cookie-overlay" role="dialog"
      aria-labelledby="cookie-title" aria-describedby="cookie-desc"
      aria-modal="true" tabindex="-1" hidden>
@@ -29,12 +29,12 @@
   </div>
 </div>
 
-{# ──────────────────────────────────────────────────────────────
+<!-- {# ──────────────────────────────────────────────────────────────
    SECTION ORDER — wrapped in .page-sections for CSS-order reorder.
    Header + Hero stay fixed at the top. Other sections have order:10
    by default; adding .section-promoted pushes one to order:3 (right
    below trust bar). Backend can also set is-hidden to hide a section.
-   ────────────────────────────────────────────────────────────── #}
+   ────────────────────────────────────────────────────────────── #} -->
 <div class="page-sections">
 {% include "sections/header.html" %}
 {% include "sections/hero.html" %}
