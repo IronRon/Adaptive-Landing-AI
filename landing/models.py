@@ -337,13 +337,20 @@ class BanditDecision(models.Model):
     )
     context_bucket = models.CharField(
         max_length=100,
+        blank=True,
+        default="",
         db_index=True,
-        help_text='E.g. "mobile_price", "desktop_unknown".',
+        help_text='Legacy bucket string (no longer used by the linear bandit).',
     )
     context_json = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Full context snapshot used when making the decision.",
+        help_text="Human-readable context snapshot used when making the decision.",
+    )
+    context_vector = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Numeric feature vector (list of floats) used by the linear bandit.",
     )
     arm = models.ForeignKey(
         BanditArm,
@@ -377,7 +384,8 @@ class BanditArmStat(models.Model):
     """
     Running statistics for a (context_bucket, arm) pair.
 
-    Updated incrementally each time a reward is observed.
+    DEPRECATED — kept for backward compatibility with existing data.
+    The linear bandit now uses LinUCBParam instead.
     """
 
     context_bucket = models.CharField(max_length=100, db_index=True)
@@ -413,3 +421,45 @@ class BanditArmStat(models.Model):
 
     def __str__(self):
         return f"Stat bucket={self.context_bucket} arm={self.arm.arm_id} n={self.n} mean={self.mean_reward:.3f}"
+
+
+class LinUCBParam(models.Model):
+    """
+    Per-arm parameters for the linear contextual bandit (online ridge regression).
+
+    Stores the sufficient statistics A (d×d matrix) and b (d-length vector).
+    The predicted reward for a context vector x is:
+
+        θ = A⁻¹ · b    (ridge regression weights)
+        reward = x · θ   (dot product)
+
+    A is initialised to λ·I (identity × regularisation constant) and b to
+    zeros.  Each time a reward is observed for this arm with context x:
+
+        A ← A + x·xᵀ
+        b ← b + reward·x
+    """
+
+    arm = models.OneToOneField(
+        BanditArm,
+        on_delete=models.CASCADE,
+        related_name="linucb_param",
+    )
+    A_matrix = models.JSONField(
+        help_text="d×d matrix (list of lists) for ridge regression.",
+    )
+    b_vector = models.JSONField(
+        help_text="d-length vector for ridge regression.",
+    )
+    n = models.IntegerField(
+        default=0,
+        help_text="Total number of observations (pulls) for this arm.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "LinUCB Parameter"
+        verbose_name_plural = "LinUCB Parameters"
+
+    def __str__(self):
+        return f"LinUCB arm={self.arm.arm_id} n={self.n}"

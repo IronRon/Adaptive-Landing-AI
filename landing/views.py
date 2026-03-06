@@ -39,7 +39,7 @@ from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
 from .models import BanditArm, BanditDecision
-from .bandit_utils import build_context, bucketize, choose_arm, update_stats
+from .bandit_utils import build_context, choose_arm, update_stats
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +369,7 @@ def end_session(request):
             reward = 1.0 if session.cta_clicked else 0.0
             decision.reward = reward
             decision.save(update_fields=["reward"])
-            update_stats(decision.context_bucket, decision.arm, reward)
+            update_stats(decision.arm, decision.context_vector, reward)
             logger.info(
                 "Bandit reward: session=%s arm=%s reward=%.1f",
                 session.session_id, decision.arm.arm_id, reward,
@@ -468,16 +468,15 @@ def accept_cookies(request):
 
     if visit_number >= 2:
         try:
-            context = build_context(visitor, request)
-            bucket = bucketize(context)
-            arm, explored = choose_arm(bucket)
+            context_dict, feature_vector = build_context(visitor, request)
+            arm, explored = choose_arm(feature_vector)
 
             from .bandit_utils import EPSILON as _eps
             BanditDecision.objects.create(
                 session=session,
                 visitor=visitor,
-                context_bucket=bucket,
-                context_json=context,
+                context_json=context_dict,
+                context_vector=feature_vector,
                 arm=arm,
                 explore=explored,
                 epsilon=_eps,
@@ -486,8 +485,8 @@ def accept_cookies(request):
             page_config = arm.page_config or {}
             arm_id = arm.arm_id
             logger.info(
-                "Bandit chose arm=%s for bucket=%s (explore=%s)",
-                arm.arm_id, bucket, explored,
+                "Bandit chose arm=%s (explore=%s)",
+                arm.arm_id, explored,
             )
         except Exception:
             logger.exception("Bandit decision failed — falling back to control.")

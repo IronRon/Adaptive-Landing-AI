@@ -9,6 +9,7 @@ from .models import (
     Event,
     LandingPage,
     LandingSection,
+    LinUCBParam,
     Session,
     Visitor,
 )
@@ -67,14 +68,13 @@ class BanditDecisionAdmin(admin.ModelAdmin):
     list_display = (
         "session",
         "visitor",
-        "context_bucket",
         "arm",
         "explore",
         "epsilon",
         "reward",
         "created_at",
     )
-    list_filter = ("explore", "context_bucket")
+    list_filter = ("explore",)
     search_fields = ("session__session_id", "visitor__cookie_id", "arm__arm_id")
     readonly_fields = ("created_at",)
 
@@ -95,3 +95,10 @@ class LandingPageAdmin(admin.ModelAdmin):
 @admin.register(LandingSection)
 class LandingSectionAdmin(admin.ModelAdmin):
     list_display = ("key", "page", "order", "created_at")
+
+
+@admin.register(LinUCBParam)
+class LinUCBParamAdmin(admin.ModelAdmin):
+    list_display = ("arm", "n", "updated_at")
+    search_fields = ("arm__arm_id",)
+    readonly_fields = ("updated_at",)
