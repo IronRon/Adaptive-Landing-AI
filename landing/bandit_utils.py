@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 EPSILON = 0.10              # 10% of the time, pick a random arm (explore)
-MIN_PULLS_PER_ARM = 5       # try every arm at least 5 times before trusting predictions
+MIN_PULLS_PER_ARM = 2       # try every arm at least 2 times before trusting predictions
 LAMBDA_REG = 1.0             # safety factor for A_matrix starting values (keeps early predictions conservative)
 
 # Feature vector layout

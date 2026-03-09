@@ -5,8 +5,8 @@ contextual multi-armed bandit algorithm. The system tracks every visitor
 interaction, builds per-user engagement profiles, and automatically adjusts
 section visibility, compactness, and variant styling to maximise conversions.
 
-> **Status:** Tracking, per-session intent scoring, and a **v1 contextual
-> multi-armed bandit** (epsilon-greedy, bucketised context) are implemented and
+> **Status:** Tracking, per-session intent scoring, and a **linear contextual
+> multi-armed bandit** (ridge regression + epsilon-greedy) are implemented and
 > functional. The bandit runs for returning visitors (visit ≥ 2) and records
 > decisions + rewards end-to-end. See [BANDIT.md](BANDIT.md) for full details.
 
@@ -76,9 +76,9 @@ testimonials, about, locations, FAQ, contact, footer).
 │    ├── Event         (every tracked interaction)        │
 │    ├── BanditArm     (page config per arm)              │
 │    ├── BanditDecision(1:1 with session, logs choice)    │
-│    └── BanditArmStat (per-bucket mean reward cache)     │
+│    └── LinUCBParam   (per-arm learned weights)          │
 │                                                         │
-│  bandit_utils.py (context → bucket → choose arm)        │
+│  bandit_utils.py (context → feature vector → choose arm)│
 │  utils.py        (section scores + intent computation)  │
 └──────────────────────────────┬──────────────────────────┘
                                │
@@ -89,7 +89,7 @@ testimonials, about, locations, FAQ, contact, footer).
 │  landing_visitor  ──1:N──  landing_session               │
 │  landing_session  ──1:N──  landing_event                 │
 │  landing_session  ──1:1──  landing_banditdecision        │
-│  landing_banditarm ──1:N── landing_banditarmstat         │
+│  landing_banditarm ──1:1── landing_linucbparam           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -103,7 +103,7 @@ testimonials, about, locations, FAQ, contact, footer).
 | Database    | PostgreSQL (via psycopg2-binary)         |
 | Frontend    | Vanilla JS, Django templates, CSS       |
 | Tracking    | Custom event pipeline (tracking.js)     |
-| AI          | Contextual multi-armed bandit (epsilon-greedy, Python) |
+| AI          | Linear contextual bandit (ridge regression + ε-greedy, numpy) |
 
 ---
 
@@ -245,66 +245,58 @@ data is available to learn better coefficients.
 - `ui.js` handles all interactive UI (carousel, pricing toggle, FAQ accordion,
   smooth scroll, section variant helpers, cookie consent flow).
 
-### Contextual Multi-Armed Bandit (v1)
+### Linear Contextual Multi-Armed Bandit
 
-The bandit system is live and runs **for returning visitors** (visit ≥ 2). First
-visits collect tracking data only.
+The bandit runs **for returning visitors** (visit ≥ 2). First visits collect
+tracking data only.
 
-- **Arms** — each `BanditArm` row holds a `page_config` JSON dict consumed by
-  `applyPageConfig()` on the frontend (compact flags, hide/promote sections,
-  variant overrides). Six starter arms are seeded via
+- **Arms (23)** — each `BanditArm` row holds a `page_config` JSON dict
+  consumed by `applyPageConfig()` on the frontend. Arms cover per-section
+  compaction, hiding, promoting to top, and variant styles (highlight plans,
+  feature services, CTA emphasis, etc.). Seeded via
   `python manage.py seed_bandit_arms`.
-- **Context** — `build_context()` extracts `device_type` (mobile / desktop) and
-  `last_primary_intent` from the visitor's most recent session. `bucketize()`
-  combines them into a string key, e.g. `"mobile_price"`, giving up to ~12
-  buckets.
+- **Context** — `build_context()` turns a visitor into an **8-number feature
+  vector**: `[is_mobile, price_score, service_score, trust_score,
+  location_score, contact_score, visit_number_norm, bias]`. All values are
+  continuous (0–1), nothing is thrown away into discrete buckets.
+- **Per-arm model** — each arm has its own `LinUCBParam` storing an 8×8
+  `A_matrix` ("what visitors it has seen") and an 8-element `b_vector`
+  ("what worked"). Weights are computed as `A⁻¹ × b` — i.e. "what worked"
+  divided by "what I've seen".
 - **Policy** — epsilon-greedy (ε = 0.10) with a warmup phase. Arms with fewer
-  than `MIN_TRIES_PER_ARM` (5) pulls in the current bucket are pulled first.
-  After warmup, with probability ε a random arm is chosen (explore); otherwise
-  the arm with the highest `mean_reward` for that bucket is chosen (exploit).
+  than `MIN_PULLS_PER_ARM` (2) observations are pulled first. After warmup,
+  10% of the time a random arm is chosen (explore); 90% the arm with the
+  highest predicted reward for this visitor's features wins (exploit).
 - **Reward** — binary: 1.0 if `cta_clicked` during the session, else 0.0.
   Recorded when `end_session` fires.
-- **Decision logging** — every bandit choice is persisted in `BanditDecision`
-  (1:1 with `Session`), recording the bucket, arm, epsilon, explore flag, and
-  eventual reward.
-- **Stats cache** — `BanditArmStat` stores per-bucket per-arm `n`,
-  `sum_reward`, and `mean_reward` so the policy can query without scanning all
-  decisions.
+- **Learning** — on session end, the visitor's feature vector is used to
+  update the chosen arm's `A_matrix` (add feature combinations) and
+  `b_vector` (add features × reward). Uses numpy for all linear algebra.
+- **Decision logging** — every choice is persisted in `BanditDecision`
+  (1:1 with `Session`), recording the feature vector, arm, epsilon, explore
+  flag, and eventual reward.
 
 Full details: [BANDIT.md](BANDIT.md)
 
 ### Django Admin
 
 All models (`Visitor`, `Session`, `Event`, `BanditArm`, `BanditDecision`,
-`BanditArmStat`) are registered in the admin with appropriate `list_display`,
+`LinUCBParam`) are registered in the admin with appropriate `list_display`,
 `list_filter`, and `search_fields` for easy debugging and data inspection.
 
 ---
 
 ## What Is Next
 
-### Combinatorial Contextual Multi-Armed Bandit
-
-The current v1 treats each arm as a **fixed, hand-crafted page configuration**.
-Planned improvements:
-
-1. **Combinatorial arms** — instead of choosing one of N pre-defined configs,
+1. **Combinatorial bandit** — instead of choosing one of N pre-defined configs,
    the bandit will compose a page layout by making independent per-section
    decisions (e.g. compact vs. full for each section, which sections to promote
    or hide). This dramatically expands the configuration space without
    requiring every combination to be manually defined.
 
-2. **Linear-regression context model** — replace the current bucketed
-   mean-reward lookup with a linear model (e.g. LinUCB / ridge regression) that
-   takes a continuous feature vector as context. This removes the need for
-   discrete buckets and enables generalisation across similar visitors.
-
-3. **Richer reward signal** — extend beyond the binary CTA-click reward to
+2. **Richer reward signal** — extend beyond the binary CTA-click reward to
    incorporate scroll depth, section dwell, and intent scores as a composite
    reward.
-
-4. **Warm-start from collected data** — once enough v1 decisions have been
-   logged, use them to bootstrap the regression model before switching over.
 
 ---
 
@@ -318,11 +310,11 @@ adaptive-landing-ai/
 │   ├── urls.py
 │   └── wsgi.py
 ├── landing/                    # Main application
-│   ├── models.py               # Visitor, Session, Event, BanditArm, BanditDecision, ...
+│   ├── models.py               # Visitor, Session, Event, BanditArm, BanditDecision, LinUCBParam
 │   ├── views.py                # Endpoints + page views
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin registrations
-│   ├── bandit_utils.py         # Context → bucket → choose arm → update stats
+│   ├── bandit_utils.py         # Context → feature vector → choose arm → update weights
 │   ├── utils.py                # Scoring utilities + intent computation
 │   ├── ai_llm.py               # Legacy: LLM recommendation call
 │   ├── management/commands/seed_bandit_arms.py  # Seed starter arms
@@ -415,22 +407,20 @@ BanditArm
 BanditDecision  (one per session where bandit ran)
   ├── session         1:1 → Session
   ├── visitor         FK → Visitor
-  ├── context_bucket  char(100)  (e.g. "mobile_price")
-  ├── context_json    JSON       (full context snapshot)
+  ├── context_json    JSON       (human-readable context snapshot)
+  ├── context_vector  JSON       (feature vector — list of 8 floats)
   ├── arm             FK → BanditArm
   ├── explore         boolean
   ├── epsilon         float
   ├── reward          float      (nullable, filled at session end)
   └── created_at      datetime
 
-BanditArmStat  (per-bucket per-arm cache)
-  ├── context_bucket  char(100)
-  ├── arm             FK → BanditArm
-  ├── n               int        (pull count)
-  ├── sum_reward      float
-  ├── mean_reward     float      (sum_reward / n)
+LinUCBParam  (one per arm — learned weights for linear model)
+  ├── arm             1:1 → BanditArm
+  ├── A_matrix        JSON       (8×8 matrix — "what visitors this arm has seen")
+  ├── b_vector        JSON       (8-element list — "what worked")
+  ├── n               int        (total pulls)
   └── updated_at      datetime
-  UNIQUE (context_bucket, arm)
 ```
 
 ### Other Models (legacy)
@@ -454,8 +444,8 @@ Page load → ui.js initCookieConsent()
         │     → backend creates/finds Visitor + new Session
         │     → Set-Cookie: visitor_id=<uuid> (1 year)
         │     → computes visit_number
-        │     → IF visit ≥ 2: bandit selects arm for context bucket
-        │       → saves BanditDecision
+        │     → IF visit ≥ 2: builds feature vector, bandit picks arm
+        │       → saves BanditDecision with feature vector
         │     → returns { session_id, visit_number, arm_id, page_config }
         │
         ├── ui.js applyPageConfig(page_config)
@@ -472,7 +462,7 @@ Page load → ui.js initCookieConsent()
                     ├── flush() → send remaining events
                     └── endSession() → POST /end-session/
                           → compute intent scores
-                          → IF visit ≥ 2: compute reward, update BanditArmStat
+                          → IF visit ≥ 2: compute reward, update LinUCBParam
                           → update Session row
 ```
 

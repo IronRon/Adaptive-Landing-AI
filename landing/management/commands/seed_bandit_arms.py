@@ -20,24 +20,89 @@ from landing.bandit_utils import make_initial_A, make_initial_b
 #   { compact: [...], hide: [...], promote: "section_id", variants: {id: cls} }
 
 STARTER_ARMS = [
+    # ------------------------------------------------------------------
+    # CONTROL — no changes at all (baseline)
+    # ------------------------------------------------------------------
     {
         "arm_id": "no_change",
         "name": "Control — no layout changes",
         "page_config": {},
     },
+
+    # ------------------------------------------------------------------
+    # HERO variants
+    # ------------------------------------------------------------------
     {
         "arm_id": "hero_compact",
-        "name": "Hero section compacted",
+        "name": "Hero — compact (smaller, hides subtitle & trust badges)",
         "page_config": {
-            "compact": ["hero"],
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"hero": "hero-compact"},
+        },
+    },
+    {
+        "arm_id": "hero_cta_emphasis",
+        "name": "Hero — pulsing CTA button",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"hero": "hero-cta-emphasis"},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # SERVICES variants
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "services_compact",
+        "name": "Services — compact (hides descriptions, shows top 3)",
+        "page_config": {
+            "compact": ["services"],
             "hide": [],
             "promote": None,
             "variants": {},
         },
     },
     {
+        "arm_id": "featured_service_1",
+        "name": "Services — highlight service card 1",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"services": "featured-service-1"},
+        },
+    },
+    {
+        "arm_id": "featured_service_2",
+        "name": "Services — highlight service card 2",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"services": "featured-service-2"},
+        },
+    },
+    {
+        "arm_id": "featured_service_3",
+        "name": "Services — highlight service card 3",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"services": "featured-service-3"},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # PRICING variants
+    # ------------------------------------------------------------------
+    {
         "arm_id": "pricing_compact",
-        "name": "Pricing section compacted",
+        "name": "Pricing — compact (fewer features shown)",
         "page_config": {
             "compact": ["pricing"],
             "hide": [],
@@ -46,8 +111,18 @@ STARTER_ARMS = [
         },
     },
     {
-        "arm_id": "pricing_highlight_plan_2",
-        "name": "Pricing — highlight middle plan",
+        "arm_id": "highlight_plan_1",
+        "name": "Pricing — highlight plan 1 (cheapest)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"pricing": "highlight-plan-1"},
+        },
+    },
+    {
+        "arm_id": "highlight_plan_2",
+        "name": "Pricing — highlight plan 2 (middle)",
         "page_config": {
             "compact": [],
             "hide": [],
@@ -56,8 +131,22 @@ STARTER_ARMS = [
         },
     },
     {
+        "arm_id": "highlight_plan_3",
+        "name": "Pricing — highlight plan 3 (premium)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"pricing": "highlight-plan-3"},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # TESTIMONIALS variants
+    # ------------------------------------------------------------------
+    {
         "arm_id": "testimonials_single",
-        "name": "Testimonials — single spotlight",
+        "name": "Testimonials — single card spotlight",
         "page_config": {
             "compact": [],
             "hide": [],
@@ -66,15 +155,136 @@ STARTER_ARMS = [
         },
     },
     {
-        "arm_id": "services_compact",
-        "name": "Services section compacted",
+        "arm_id": "testimonials_compact",
+        "name": "Testimonials — compact (smaller quotes, no subheading)",
         "page_config": {
-            "compact": ["services"],
+            "compact": ["testimonials"],
             "hide": [],
             "promote": None,
             "variants": {},
         },
     },
+
+    # ------------------------------------------------------------------
+    # FAQ variants
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "faq_compact",
+        "name": "FAQ — compact (smaller text)",
+        "page_config": {
+            "compact": ["faq"],
+            "hide": [],
+            "promote": None,
+            "variants": {},
+        },
+    },
+    {
+        "arm_id": "faq_top3",
+        "name": "FAQ — show only top 3 with 'View All' button",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": None,
+            "variants": {"faq": "faq-compact-top3"},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # ABOUT variants
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "about_compact",
+        "name": "About — compact (hides stats & extra text)",
+        "page_config": {
+            "compact": ["about"],
+            "hide": [],
+            "promote": None,
+            "variants": {},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # LOCATIONS variants
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "locations_compact",
+        "name": "Locations — compact (hides addresses & hours)",
+        "page_config": {
+            "compact": ["locations"],
+            "hide": [],
+            "promote": None,
+            "variants": {},
+        },
+    },
+    {
+        "arm_id": "hide_locations",
+        "name": "Locations — hidden entirely",
+        "page_config": {
+            "compact": [],
+            "hide": ["locations"],
+            "promote": None,
+            "variants": {},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # CONTACT variants
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "contact_compact",
+        "name": "Contact — compact (hides contact details, form only)",
+        "page_config": {
+            "compact": ["contact"],
+            "hide": [],
+            "promote": None,
+            "variants": {},
+        },
+    },
+
+    # ------------------------------------------------------------------
+    # PROMOTE variants — move a section right below the trust bar
+    # ------------------------------------------------------------------
+    {
+        "arm_id": "promote_pricing",
+        "name": "Promote pricing to top (below trust bar)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": "pricing",
+            "variants": {},
+        },
+    },
+    {
+        "arm_id": "promote_services",
+        "name": "Promote services to top (below trust bar)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": "services",
+            "variants": {},
+        },
+    },
+    {
+        "arm_id": "promote_testimonials",
+        "name": "Promote testimonials to top (below trust bar)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": "testimonials",
+            "variants": {},
+        },
+    },
+    {
+        "arm_id": "promote_contact",
+        "name": "Promote contact to top (below trust bar)",
+        "page_config": {
+            "compact": [],
+            "hide": [],
+            "promote": "contact",
+            "variants": {},
+        },
+    },
+
 ]
 
 
