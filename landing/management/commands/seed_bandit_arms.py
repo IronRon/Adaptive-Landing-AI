@@ -13,7 +13,7 @@ Usage:
 from django.core.management.base import BaseCommand
 
 from landing.models import BanditArm, LinUCBParam
-from landing.bandit_utils import FEATURE_DIM, LAMBDA_REG, _identity, _zeros
+from landing.bandit_utils import make_initial_A, make_initial_b
 
 
 # Each arm's page_config follows the applyPageConfig shape:
@@ -114,8 +114,8 @@ class Command(BaseCommand):
             _param, p_created = LinUCBParam.objects.get_or_create(
                 arm=arm,
                 defaults={
-                    "A_matrix": _identity(FEATURE_DIM, LAMBDA_REG),
-                    "b_vector": _zeros(FEATURE_DIM),
+                    "A_matrix": make_initial_A(),
+                    "b_vector": make_initial_b(),
                 },
             )
             if p_created:

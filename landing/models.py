@@ -425,19 +425,31 @@ class BanditArmStat(models.Model):
 
 class LinUCBParam(models.Model):
     """
-    Per-arm parameters for the linear contextual bandit (online ridge regression).
+    Stored learning parameters for one bandit arm (linear contextual bandit).
 
-    Stores the sufficient statistics A (d×d matrix) and b (d-length vector).
-    The predicted reward for a context vector x is:
+    Each arm learns which kinds of visitors respond well to it. Instead of
+    storing the final weights directly, we store two "compressed memory"
+    fields that together remember everything needed to compute weights:
 
-        θ = A⁻¹ · b    (ridge regression weights)
-        reward = x · θ   (dot product)
+    A_matrix ("what I've seen")
+        An 8×8 grid (features × features). Each time a visitor is shown
+        this arm, their feature vector is multiplied by itself to produce
+        an 8×8 grid of feature-pair combinations, and added to A_matrix.
+        The diagonal tracks how much of each feature has been seen;
+        the off-diagonal cells track which features appeared together
+        (correlations), preventing the model from double-counting.
+        Starts as an identity matrix (1s on diagonal) as a safe default
+        that prevents division-by-zero and fades away as real data arrives.
 
-    A is initialised to λ·I (identity × regularisation constant) and b to
-    zeros.  Each time a reward is observed for this arm with context x:
+    b_vector ("what worked")
+        A list of 8 numbers. Each time a visitor clicks the CTA after
+        seeing this arm (reward=1), their feature vector gets added to
+        b_vector. Non-clicks (reward=0) contribute nothing. Over time
+        b_vector accumulates a picture of "the kind of visitor this arm
+        works well for."
 
-        A ← A + x·xᵀ
-        b ← b + reward·x
+    To get the arm's weights:  weights = A_matrix⁻¹ × b_vector
+    Think of it as: "what worked" ÷ "what I've seen" = best prediction.
     """
 
     arm = models.OneToOneField(
@@ -446,14 +458,14 @@ class LinUCBParam(models.Model):
         related_name="linucb_param",
     )
     A_matrix = models.JSONField(
-        help_text="d×d matrix (list of lists) for ridge regression.",
+        help_text="8×8 grid tracking what visitors this arm has been shown to (feature combinations).",
     )
     b_vector = models.JSONField(
-        help_text="d-length vector for ridge regression.",
+        help_text="8-number list tracking which visitor features led to CTA clicks for this arm.",
     )
     n = models.IntegerField(
         default=0,
-        help_text="Total number of observations (pulls) for this arm.",
+        help_text="Total number of times this arm has been shown to a visitor.",
     )
     updated_at = models.DateTimeField(auto_now=True)
 

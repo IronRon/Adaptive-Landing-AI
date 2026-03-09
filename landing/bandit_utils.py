@@ -1,28 +1,29 @@
 """
 Bandit utility functions — Linear contextual bandit with ε-greedy exploration.
 
-build_context    – extract a numeric feature vector from visitor + request
-choose_arm       – predict reward per arm via linear model, ε-greedy selection
-update_stats     – online ridge regression update for (arm, context, reward)
-
-Replaces the old bucket-based approach: instead of discretising context into
-buckets like "desktop_price", the bandit now uses a continuous feature vector
-and learns a weight vector per arm via online ridge regression.
+build_context    – turn a visitor into a list of 8 numbers (the feature vector)
+choose_arm       – predict which arm will work best, with ε-greedy exploration
+update_stats     – learn from the result of a session (adjust weights)
 
 How it works (plain English)
 ----------------------------
-Each arm has a set of learned **weights** — one per context feature.
-When a visitor arrives, we multiply each feature by the arm's weight and
-add them up.  That sum is the *predicted reward* for the arm.
+Instead of putting visitors into rigid buckets like "desktop_price",
+each visitor is described by a list of 8 numbers — their feature vector.
+Nothing is thrown away; all the continuous scores are kept as-is.
 
-    predicted_reward = sum(feature_i × weight_i for each feature)
+Each arm learns a set of **weights** — one weight per feature. To predict
+whether an arm will work for a visitor, multiply each feature by its
+weight and add them up:
 
-With probability ε we ignore the prediction and pick a random arm
-(explore); otherwise we pick the arm with the highest predicted reward
-(exploit).  Same ε-greedy logic as before — just smarter predictions.
+    predicted_reward = sum(feature_i × weight_i  for each feature)
 
-When the session ends and a reward (CTA clicked = 1.0, else 0.0) arrives
-we adjust the weights so the prediction gets more accurate next time.
+The arm with the highest predicted reward wins (90% of the time).
+The other 10% we pick a random arm to keep exploring (ε-greedy).
+
+When the session ends and we know if the visitor clicked a CTA
+(reward = 1.0) or not (reward = 0.0), we update the arm's stored
+parameters (A_matrix and b_vector in LinUCBParam) so the weights
+become more accurate for similar visitors in the future.
 
 Feature vector (d=8)
 --------------------
@@ -33,6 +34,8 @@ Feature vector (d=8)
 import logging
 import random
 
+import numpy as np
+
 from .models import BanditArm, LinUCBParam, Session
 
 logger = logging.getLogger(__name__)
@@ -41,9 +44,9 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-EPSILON = 0.10              # exploration probability
-MIN_PULLS_PER_ARM = 5       # warmup: uniform exploration until each arm has this many pulls
-LAMBDA_REG = 1.0             # ridge regression regularisation (initial A = λI)
+EPSILON = 0.10              # 10% of the time, pick a random arm (explore)
+MIN_PULLS_PER_ARM = 5       # try every arm at least 5 times before trusting predictions
+LAMBDA_REG = 1.0             # safety factor for A_matrix starting values (keeps early predictions conservative)
 
 # Feature vector layout
 FEATURE_NAMES = [
@@ -60,89 +63,43 @@ FEATURE_DIM = len(FEATURE_NAMES)   # 8
 
 
 # ---------------------------------------------------------------------------
-# Pure-Python linear algebra helpers  (d=8 — no numpy needed)
+# Numpy helpers — converting to/from JSON-safe lists for database storage
 # ---------------------------------------------------------------------------
 
-def _dot(a, b):
-    """Dot product of two vectors."""
-    return sum(ai * bi for ai, bi in zip(a, b))
+def make_initial_A():
+    """Return the starting A_matrix as a JSON-safe nested list.
 
-
-def _outer(a, b):
-    """Outer product: returns a d×d matrix (list of lists)."""
-    return [[ai * bj for bj in b] for ai in a]
-
-
-def _mat_add(A, B):
-    """Element-wise addition of two d×d matrices."""
-    return [[A[i][j] + B[i][j] for j in range(len(A[0]))] for i in range(len(A))]
-
-
-def _vec_add(a, b):
-    """Element-wise addition of two vectors."""
-    return [ai + bi for ai, bi in zip(a, b)]
-
-
-def _vec_scale(v, s):
-    """Scalar multiplication of a vector."""
-    return [vi * s for vi in v]
-
-
-def _identity(d, lam=1.0):
-    """Return a d×d identity matrix scaled by λ."""
-    return [[lam if i == j else 0.0 for j in range(d)] for i in range(d)]
-
-
-def _zeros(d):
-    """Return a zero vector of length d."""
-    return [0.0] * d
-
-
-def _solve(A, b):
+    np.eye(d) creates an 8×8 identity matrix (1s on diagonal, 0s elsewhere).
+    Multiplied by LAMBDA_REG (1.0) as a safety net for early predictions.
+    .tolist() converts the numpy array to plain Python lists for JSONField.
     """
-    Solve Ax = b via Gauss-Jordan elimination with partial pivoting.
+    return (np.eye(FEATURE_DIM) * LAMBDA_REG).tolist()
 
-    A is d×d, b is length-d.  Returns x as a list of floats.
-    Does NOT modify the inputs (works on copies).
+
+def make_initial_b():
+    """Return the starting b_vector as a JSON-safe list.
+
+    np.zeros(d) creates a list of 8 zeros — "no rewards seen yet."
+    .tolist() converts to plain Python list for JSONField.
     """
-    d = len(b)
-    # Build augmented matrix [A | b]
-    aug = [A[i][:] + [b[i]] for i in range(d)]
-
-    for col in range(d):
-        # Partial pivoting — swap with the row that has the largest abs value
-        max_row = max(range(col, d), key=lambda r: abs(aug[r][col]))
-        aug[col], aug[max_row] = aug[max_row], aug[col]
-
-        pivot = aug[col][col]
-        if abs(pivot) < 1e-12:
-            continue  # near-singular — skip this column
-
-        # Scale pivot row so pivot becomes 1
-        inv_pivot = 1.0 / pivot
-        for j in range(col, d + 1):
-            aug[col][j] *= inv_pivot
-
-        # Eliminate this column in all other rows
-        for row in range(d):
-            if row == col:
-                continue
-            factor = aug[row][col]
-            for j in range(col, d + 1):
-                aug[row][j] -= factor * aug[col][j]
-
-    return [aug[i][d] for i in range(d)]
+    return np.zeros(FEATURE_DIM).tolist()
 
 
-def _predict(A_matrix, b_vector, x):
+def _predict(A_list, b_list, x_list):
     """
-    Predict reward for context vector x given model parameters (A, b).
+    Predict reward for a visitor (context vector x).
 
-    Works out the weight vector:  θ = A⁻¹ · b
-    Then returns:  predicted_reward = dot(x, θ)
+    1. np.array() converts the stored JSON lists back into numpy arrays.
+    2. np.linalg.solve(A, b) computes weights = A⁻¹ × b
+       ("what worked" ÷ "what I've seen").
+    3. weights @ x multiplies each feature by its weight and adds up
+       → a single predicted reward number.
     """
-    theta = _solve(A_matrix, b_vector)
-    return _dot(x, theta)
+    A = np.array(A_list)
+    b = np.array(b_list)
+    x = np.array(x_list)
+    weights = np.linalg.solve(A, b)
+    return float(weights @ x)
 
 
 # ---------------------------------------------------------------------------
@@ -247,8 +204,8 @@ def choose_arm(feature_vector, epsilon=EPSILON):
         param, _created = LinUCBParam.objects.get_or_create(
             arm=arm,
             defaults={
-                "A_matrix": _identity(FEATURE_DIM, LAMBDA_REG),
-                "b_vector": _zeros(FEATURE_DIM),
+                "A_matrix": make_initial_A(),
+                "b_vector": make_initial_b(),
             },
         )
         params[arm.pk] = param
@@ -287,37 +244,44 @@ def choose_arm(feature_vector, epsilon=EPSILON):
 
 def update_stats(arm, feature_vector, reward):
     """
-    Online ridge regression update for the given arm.
+    Learn from a completed session — update this arm's stored parameters.
 
-    A ← A + x·xᵀ       (accumulate information about the context)
-    b ← b + reward · x  (accumulate reward signal)
+    A_matrix ("what I've seen"):
+        Add this visitor's feature combinations so the model remembers
+        what kind of visitors it has been shown to. This is done by
+        multiplying the feature vector by itself to get an 8×8 grid
+        and adding it to A_matrix.
 
-    When we later need the weight vector:  θ = A⁻¹·b
-    This is standard online ridge regression — the same maths used by
-    LinUCB but without the confidence bonus (we use ε-greedy instead).
+    b_vector ("what worked"):
+        Add this visitor's features × reward. If the visitor clicked
+        (reward=1), their features get added in full. If they didn't
+        click (reward=0), nothing changes — only successes contribute.
+
+    Next time we need weights:  weights = A_matrix⁻¹ × b_vector
+    i.e. "what worked" divided by "what I've seen" = best prediction.
     """
     param, _ = LinUCBParam.objects.get_or_create(
         arm=arm,
         defaults={
-            "A_matrix": _identity(FEATURE_DIM, LAMBDA_REG),
-            "b_vector": _zeros(FEATURE_DIM),
+            "A_matrix": make_initial_A(),
+            "b_vector": make_initial_b(),
         },
     )
 
-    x = feature_vector
-    A = param.A_matrix
-    b = param.b_vector
+    # Convert stored lists into numpy arrays for easy math
+    x = np.array(feature_vector)
+    A = np.array(param.A_matrix)
+    b = np.array(param.b_vector)
 
-    # A ← A + x·xᵀ
-    xxT = _outer(x, x)
-    A = _mat_add(A, xxT)
+    # "What I've seen" — np.outer(x, x) gives the 8×8 feature combination grid
+    A = A + np.outer(x, x)
 
-    # b ← b + reward · x
-    rx = _vec_scale(x, reward)
-    b = _vec_add(b, rx)
+    # "What worked" — features × reward (only changes if reward > 0)
+    b = b + reward * x
 
-    param.A_matrix = A
-    param.b_vector = b
+    # Convert back to plain lists for JSONField storage
+    param.A_matrix = A.tolist()
+    param.b_vector = b.tolist()
     param.n += 1
     param.save()
 
