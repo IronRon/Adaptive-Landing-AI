@@ -469,7 +469,7 @@ def accept_cookies(request):
     if visit_number >= 2:
         try:
             context_dict, feature_vector = build_context(visitor, request)
-            arm, explored = choose_arm(feature_vector)
+            arm, explored, predicted_score = choose_arm(feature_vector)
 
             from .bandit_utils import EPSILON as _eps
             BanditDecision.objects.create(
@@ -480,6 +480,7 @@ def accept_cookies(request):
                 arm=arm,
                 explore=explored,
                 epsilon=_eps,
+                predicted_score=predicted_score,
             )
 
             page_config = arm.page_config or {}

@@ -191,7 +191,9 @@ def choose_arm(feature_vector, epsilon=EPSILON):
         For each arm compute  predicted_reward = dot(x, θ_arm)
         and pick the arm with the highest value.
 
-    Returns ``(arm, explored_flag)``.
+    Returns ``(arm, explored_flag, predicted_score)``.
+    ``predicted_score`` is the model's predicted reward for the chosen arm,
+    or ``None`` during warmup / exploration.
     """
     arms = list(BanditArm.objects.filter(is_active=True))
     if not arms:
@@ -216,13 +218,13 @@ def choose_arm(feature_vector, epsilon=EPSILON):
     if under_pulled:
         chosen = random.choice(under_pulled)
         logger.info("Bandit warmup: arm=%s (n=%d)", chosen.arm_id, params[chosen.pk].n)
-        return chosen, True
+        return chosen, True, None
 
     # --- ε-greedy ----------------------------------------------------------
     if random.random() < epsilon:
         chosen = random.choice(arms)
         logger.info("Bandit explore (ε=%.2f): arm=%s", epsilon, chosen.arm_id)
-        return chosen, True
+        return chosen, True, None
 
     # Exploit — pick arm with highest predicted reward
     best_arm = None
@@ -235,7 +237,7 @@ def choose_arm(feature_vector, epsilon=EPSILON):
             best_arm = arm
 
     logger.info("Bandit exploit: arm=%s predicted=%.4f", best_arm.arm_id, best_score)
-    return best_arm, False
+    return best_arm, False, best_score
 
 
 # ---------------------------------------------------------------------------

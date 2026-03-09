@@ -368,6 +368,11 @@ class BanditDecision(models.Model):
         blank=True,
         help_text="Filled in when the session ends (1.0 if CTA clicked, else 0.0).",
     )
+    predicted_score = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="The model's predicted reward for the chosen arm at decision time.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

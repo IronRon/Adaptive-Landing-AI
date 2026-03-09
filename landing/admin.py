@@ -71,6 +71,7 @@ class BanditDecisionAdmin(admin.ModelAdmin):
         "arm",
         "explore",
         "epsilon",
+        "predicted_score",
         "reward",
         "created_at",
     )
