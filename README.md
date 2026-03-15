@@ -5,10 +5,12 @@ contextual multi-armed bandit algorithm. The system tracks every visitor
 interaction, builds per-user engagement profiles, and automatically adjusts
 section visibility, compactness, and variant styling to maximise conversions.
 
-> **Status:** Tracking, per-session intent scoring, and a **linear contextual
-> multi-armed bandit** (ridge regression + epsilon-greedy) are implemented and
-> functional. The bandit runs for returning visitors (visit ≥ 2) and records
-> decisions + rewards end-to-end. See [BANDIT.md](BANDIT.md) for full details.
+> **Status:** Tracking, per-session intent scoring, and a **combinational
+> contextual multi-armed bandit (slate bandit)** are implemented and
+> functional. The model still uses per-arm linear ridge regression +
+> epsilon-greedy, but now chooses up to 3 compatible arms per returning visit,
+> merges their configs, and applies observation-gated reward updates.
+> See [BANDIT.md](BANDIT.md) for full details.
 
 ---
 
@@ -74,11 +76,11 @@ testimonials, about, locations, FAQ, contact, footer).
 │    ├── Visitor       (cookie-based identity)            │
 │    ├── Session       (one per page-load, visit_number)  │
 │    ├── Event         (every tracked interaction)        │
-│    ├── BanditArm     (page config per arm)              │
-│    ├── BanditDecision(1:1 with session, logs choice)    │
+│    ├── BanditArm     (page config + affected sections)  │
+│    ├── BanditDecision(1:1 with session, logs slate)     │
 │    └── LinUCBParam   (per-arm learned weights)          │
 │                                                         │
-│  bandit_utils.py (context → feature vector → choose arm)│
+│  bandit_utils.py (context → score arms → choose slate)  │
 │  utils.py        (section scores + intent computation)  │
 └──────────────────────────────┬──────────────────────────┘
                                │
@@ -103,7 +105,7 @@ testimonials, about, locations, FAQ, contact, footer).
 | Database    | PostgreSQL (via psycopg2-binary)         |
 | Frontend    | Vanilla JS, Django templates, CSS       |
 | Tracking    | Custom event pipeline (tracking.js)     |
-| AI          | Linear contextual bandit (ridge regression + ε-greedy, numpy) |
+| AI          | Combinational contextual bandit: per-arm linear ridge regression + ε-greedy slate selection (numpy) |
 
 ---
 
@@ -120,7 +122,9 @@ testimonials, about, locations, FAQ, contact, footer).
   - New visitor → creates `Visitor` + `Session`, sets `visitor_id` cookie.
   - Returning visitor → finds existing `Visitor` (from cookie), closes stale
     sessions, creates a fresh `Session`.
-  - Returns `{ session_id, visitor_id, is_new }` to the frontend.
+  - Returns `session_id`, `visitor_id`, `visit_number`, and for returning
+    visits includes slate output (`chosen_arms`, merged `page_config`,
+    `explore`).
 
 ### Session Management
 
@@ -245,10 +249,10 @@ data is available to learn better coefficients.
 - `ui.js` handles all interactive UI (carousel, pricing toggle, FAQ accordion,
   smooth scroll, section variant helpers, cookie consent flow).
 
-### Linear Contextual Multi-Armed Bandit
+### Combinational Contextual Multi-Armed Bandit (Slate)
 
-The bandit runs **for returning visitors** (visit ≥ 2). First visits collect
-tracking data only.
+The bandit runs for returning visitors (visit ≥ 2). First visits remain control
+(no decision row, no page change) and only collect tracking data.
 
 - **Arms (23)** — each `BanditArm` row holds a `page_config` JSON dict
   consumed by `applyPageConfig()` on the frontend. Arms cover per-section
@@ -263,18 +267,20 @@ tracking data only.
   `A_matrix` ("what visitors it has seen") and an 8-element `b_vector`
   ("what worked"). Weights are computed as `A⁻¹ × b` — i.e. "what worked"
   divided by "what I've seen".
-- **Policy** — epsilon-greedy (ε = 0.10) with a warmup phase. Arms with fewer
-  than `MIN_PULLS_PER_ARM` (2) observations are pulled first. After warmup,
-  10% of the time a random arm is chosen (explore); 90% the arm with the
-  highest predicted reward for this visitor's features wins (exploit).
-- **Reward** — binary: 1.0 if `cta_clicked` during the session, else 0.0.
-  Recorded when `end_session` fires.
-- **Learning** — on session end, the visitor's feature vector is used to
-  update the chosen arm's `A_matrix` (add feature combinations) and
-  `b_vector` (add features × reward). Uses numpy for all linear algebra.
-- **Decision logging** — every choice is persisted in `BanditDecision`
-  (1:1 with `Session`), recording the feature vector, arm, epsilon, explore
-  flag, and eventual reward.
+- **Slate policy (K=3)** — arms are scored per context, sorted by predicted
+  reward, then greedily selected into a conflict-free slate of up to 3 arms.
+- **Conflict rules** — no duplicates, no variant-key collisions, no multiple
+  promote actions, and no hide-vs-modify conflicts on the same section.
+- **Exploration** — epsilon-greedy is still used (ε = 0.10), but exploration
+  now replaces one slot in the slate with a random valid non-conflicting arm.
+- **Merged config** — chosen arms are merged into one deterministic page_config
+  payload (compact/hide unions, single promote, merged variants).
+- **Reward** — binary full-bandit reward: 1.0 if cta_clicked, else 0.0.
+- **Observation-gated learning** — each chosen arm is updated only if at least
+  one of its affected_sections was observed by the visitor (section_view or
+  section_dwell event).
+- **Decision logging** — BanditDecision stores chosen_arm_ids, merged_page_config,
+  reward, and updated_arm_ids for debugging and idempotent processing.
 
 Full details: [BANDIT.md](BANDIT.md)
 
@@ -288,15 +294,16 @@ All models (`Visitor`, `Session`, `Event`, `BanditArm`, `BanditDecision`,
 
 ## What Is Next
 
-1. **Combinatorial bandit** — instead of choosing one of N pre-defined configs,
-   the bandit will compose a page layout by making independent per-section
-   decisions (e.g. compact vs. full for each section, which sections to promote
-   or hide). This dramatically expands the configuration space without
-   requiring every combination to be manually defined.
-
-2. **Richer reward signal** — extend beyond the binary CTA-click reward to
+1. **Richer reward signal** — extend beyond the binary CTA-click reward to
    incorporate scroll depth, section dwell, and intent scores as a composite
    reward.
+
+2. **Joint slate optimization** — current learning is per-arm with
+  compatibility filtering. A future upgrade could model interaction effects
+  between arm combinations directly.
+
+3. **Counterfactual evaluation and offline replay** — add tooling to compare
+  candidate policies safely before rollout.
 
 ---
 
@@ -314,7 +321,7 @@ adaptive-landing-ai/
 │   ├── views.py                # Endpoints + page views
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin registrations
-│   ├── bandit_utils.py         # Context → feature vector → choose arm → update weights
+│   ├── bandit_utils.py         # Context → score arms → choose slate → update weights
 │   ├── utils.py                # Scoring utilities + intent computation
 │   ├── ai_llm.py               # Legacy: LLM recommendation call
 │   ├── management/commands/seed_bandit_arms.py  # Seed starter arms
@@ -398,22 +405,26 @@ Event
 
 ```
 BanditArm
-  ├── arm_id          char(100)  (unique, machine-readable key)
-  ├── name            char(255)  (human label)
-  ├── page_config     JSON       (consumed by applyPageConfig on frontend)
-  ├── is_active       boolean    (inactive arms excluded from selection)
-  └── created_at      datetime
+  ├── arm_id            char(100)  (unique, machine-readable key)
+  ├── name              char(255)  (human label)
+  ├── page_config       JSON       (consumed by applyPageConfig on frontend)
+  ├── affected_sections JSON[]     (sections this arm modifies)
+  ├── is_active         boolean    (inactive arms excluded from selection)
+  └── created_at        datetime
 
 BanditDecision  (one per session where bandit ran)
-  ├── session         1:1 → Session
-  ├── visitor         FK → Visitor
-  ├── context_json    JSON       (human-readable context snapshot)
-  ├── context_vector  JSON       (feature vector — list of 8 floats)
-  ├── arm             FK → BanditArm
-  ├── explore         boolean
-  ├── epsilon         float
-  ├── reward          float      (nullable, filled at session end)
-  └── created_at      datetime
+  ├── session            1:1 → Session
+  ├── visitor            FK → Visitor
+  ├── context_json       JSON       (human-readable context snapshot)
+  ├── context_vector     JSON       (feature vector — list of 8 floats)
+  ├── arm                FK → BanditArm (legacy, nullable)
+  ├── chosen_arm_ids     JSON[]     (slate arm_id list)
+  ├── merged_page_config JSON       (final config sent to frontend)
+  ├── explore            boolean
+  ├── epsilon            float
+  ├── reward             float      (nullable, filled at session end)
+  ├── updated_arm_ids    JSON[]     (arms updated after observation gating)
+  └── created_at         datetime
 
 LinUCBParam  (one per arm — learned weights for linear model)
   ├── arm             1:1 → BanditArm
@@ -444,9 +455,9 @@ Page load → ui.js initCookieConsent()
         │     → backend creates/finds Visitor + new Session
         │     → Set-Cookie: visitor_id=<uuid> (1 year)
         │     → computes visit_number
-        │     → IF visit ≥ 2: builds feature vector, bandit picks arm
-        │       → saves BanditDecision with feature vector
-        │     → returns { session_id, visit_number, arm_id, page_config }
+        │     → IF visit ≥ 2: builds feature vector, bandit picks slate (K=3)
+        │       → merges page config, saves BanditDecision
+        │     → returns { session_id, visit_number, chosen_arms, page_config }
         │
         ├── ui.js applyPageConfig(page_config)
         │     → applies compact / hide / promote / variant changes to DOM
@@ -461,9 +472,10 @@ Page load → ui.js initCookieConsent()
               └── visibilitychange / beforeunload
                     ├── flush() → send remaining events
                     └── endSession() → POST /end-session/
-                          → compute intent scores
-                          → IF visit ≥ 2: compute reward, update LinUCBParam
-                          → update Session row
+                        → compute intent scores
+                        → IF visit ≥ 2: idempotent reward update
+                        → update only observed arms in chosen slate
+                        → update Session row
 ```
 
 ---
@@ -510,7 +522,7 @@ python manage.py runserver
 | `/admin/`               | Django admin (inspect tracked data)|
 | `POST /accept-cookies/` | Cookie acceptance + session start  |
 | `POST /track-interactions/` | Batched event ingestion        |
-| `POST /end-session/`        | End session + compute intent scores |
+| `POST /end-session/`        | End session + compute intent scores + idempotent slate reward update |
 
 ---
 
