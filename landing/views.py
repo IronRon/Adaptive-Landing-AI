@@ -352,6 +352,7 @@ def end_session(request):
     session.max_scroll_pct = scores["max_scroll_pct"]
     session.engaged_time_ms = scores["engaged_time_ms"]
     session.cta_clicked = scores["cta_clicked"]
+    session.pricing_cta_clicked = scores["pricing_cta_clicked"]
     session.price_intent_score = scores["price_intent_score"]
     session.service_intent_score = scores["service_intent_score"]
     session.trust_intent_score = scores["trust_intent_score"]
@@ -374,7 +375,16 @@ def end_session(request):
                     session.session_id,
                 )
             else:
-                reward = 1.0 if session.cta_clicked else 0.0
+                # Tiered reward:
+                #   1.0 – clicked a pricing-plan CTA (full conversion intent)
+                #   0.5 – clicked any other CTA (navigated toward pricing)
+                #   0.0 – no CTA interaction
+                if session.pricing_cta_clicked:
+                    reward = 1.0
+                elif session.cta_clicked:
+                    reward = 0.5
+                else:
+                    reward = 0.0
 
                 # Determine which sections the visitor actually saw
                 observed_sections = set(

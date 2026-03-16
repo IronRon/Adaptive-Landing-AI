@@ -223,9 +223,19 @@ def compute_session_intent_scores(session: Session) -> dict:
             engaged_time_ms = ms
 
     # ------------------------------------------------------------------
-    # 5. CTA clicked?  (any event with is_cta or element containing "cta")
+    # 5. CTA signals
+    #    cta_clicked         – any CTA click anywhere on the page
+    #    pricing_cta_clicked – CTA click specifically inside the pricing
+    #                          section (plan-select buttons → full conversion)
     # ------------------------------------------------------------------
     cta_clicked = events.filter(
+        Q(is_cta=True) | Q(element__icontains="cta")
+    ).exists()
+
+    pricing_cta_clicked = events.filter(
+        event_type="click",
+        section="pricing",
+    ).filter(
         Q(is_cta=True) | Q(element__icontains="cta")
     ).exists()
 
@@ -252,4 +262,5 @@ def compute_session_intent_scores(session: Session) -> dict:
         "max_scroll_pct":        max_scroll_pct,
         "engaged_time_ms":       engaged_time_ms,
         "cta_clicked":           cta_clicked,
+        "pricing_cta_clicked":   pricing_cta_clicked,
     }

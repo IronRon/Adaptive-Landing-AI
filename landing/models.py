@@ -122,6 +122,10 @@ class Session(models.Model):
         default=False,
         help_text="True if the visitor clicked any CTA element.",
     )
+    pricing_cta_clicked = models.BooleanField(
+        default=False,
+        help_text="True if the visitor clicked a CTA within the pricing section (plan purchase intent).",
+    )
     conversion = models.BooleanField(
         default=False,
         help_text="Placeholder for future conversion tracking.",
@@ -374,7 +378,7 @@ class BanditDecision(models.Model):
     reward = models.FloatField(
         null=True,
         blank=True,
-        help_text="Filled in when the session ends (1.0 if CTA clicked, else 0.0).",
+        help_text="Filled in when the session ends (1.0 if pricing-plan CTA clicked, 0.5 if any other CTA clicked, else 0.0).",
     )
     predicted_score = models.FloatField(
         null=True,
