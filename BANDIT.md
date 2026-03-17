@@ -1,9 +1,9 @@
-# Contextual Multi-Armed Bandit
+# Contextual Multi-Armed Bandit (Combinational Slate Model)
 
-A **linear contextual bandit** that picks **one page-layout variant (arm) per
-visit** for returning users. Each arm learns which kinds of visitors it works
-well for, using ridge regression on a continuous feature vector — no discrete
-buckets.
+A **linear contextual bandit** that picks a **slate of up to K=3 compatible
+page-layout arms per returning visit**. Each arm still learns independently via
+ridge regression on a continuous feature vector (same mathematics), while a new
+slate-selection layer handles compatibility and merged page configuration.
 
 Everything lives in the **`landing`** app.
 
@@ -36,17 +36,20 @@ trying random alternatives to discover something better.
    predicted_reward = feature₁ × weight₁ + feature₂ × weight₂ + ... + feature₈ × weight₈
    ```
 
-3. **90% of the time** we pick the arm with the highest predicted reward
-   (exploit). **10% of the time** we pick a random arm (explore) so we keep
-   learning about all options.
+3. We rank arms by predicted reward and greedily build a slate of up to 3
+   **non-conflicting** arms.
 
-4. When the visitor leaves, we check if they clicked a CTA (reward = 1) or not
-   (reward = 0). We use that result to update the chosen arm's weights so
-   predictions get better over time.
+4. **90% of the time** we keep the greedy slate (exploit). **10% of the time**
+   we explore by replacing one slate slot with a random valid non-conflicting
+   arm.
+
+5. When the visitor leaves, reward is still binary (CTA clicked or not). The
+   reward is session-level (full-bandit), but each chosen arm is updated only
+   if the visitor actually observed at least one section that arm affects.
 
 That's it. Over many visits the weights converge — each arm learns which
-visitor features predict success, and the bandit naturally starts picking the
-right arm for each visitor type.
+visitor features predict success, and the bandit naturally starts composing
+better slates for each visitor type.
 
 ---
 
@@ -61,9 +64,11 @@ right arm for each visitor type.
 │  3. If visit_number == 1 → return control (no page_config)      │
 │  4. If visit_number >= 2:                                       │
 │       a. build_context(visitor, request) → feature_vector       │
-│       b. choose_arm(feature_vector) → ε-greedy pick             │
-│       c. Save BanditDecision row (with feature_vector)          │
-│       d. Return { arm_id, page_config } in JSON response        │
+│       b. choose_slate(feature_vector, K=3)                      │
+│          → greedy non-conflicting slate + ε exploration         │
+│       c. merge_page_configs(chosen_arms)                        │
+│       d. Save BanditDecision row (chosen_arm_ids, merged config)│
+│       e. Return { chosen_arms, page_config, explore }           │
 │  5. Frontend calls applyPageConfig(page_config)                 │
 └─────────────────────────────────────────────────────────────────┘
 
@@ -73,10 +78,14 @@ right arm for each visitor type.
 │  1. Compute intent scores + cta_clicked as usual                │
 │  2. If visit_number >= 2:                                       │
 │       a. Find BanditDecision for this session                   │
-│       b. reward = 1.0 if cta_clicked else 0.0                   │
-│       c. Store reward on BanditDecision                         │
-│       d. update_stats(arm, feature_vector, reward)              │
-│          → updates LinUCBParam (A_matrix, b_vector)             │
+│       b. If decision.reward already set → return (idempotent)   │
+│       c. reward = 1.0 if cta_clicked else 0.0                   │
+│       d. observed_sections = DISTINCT Event.section             │
+│          where event_type in {section_view, section_dwell}      │
+│       e. For each arm_id in decision.chosen_arm_ids:            │
+│            - load arm.affected_sections                         │
+│            - update_stats only if intersects observed_sections  │
+│       f. Save decision.reward and decision.updated_arm_ids       │
 │  3. If visit_number == 1 → nothing bandit-related               │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -177,7 +186,7 @@ solve the equation `A × weights = b` for weights.
 
 ---
 
-## Arm Selection Policy: ε-Greedy
+## Arm Selection Policy: ε-Greedy Slate Selection
 
 ```python
 EPSILON         = 0.10    # explore 10% of the time
@@ -186,35 +195,77 @@ MIN_PULLS_PER_ARM = 2     # show each arm at least 2 times before trusting predi
 
 ### Step-by-step
 
-1. **Warmup** — if any active arm has been shown fewer than 2 times total, pick
-   one of those under-explored arms at random. This ensures every arm gets at
-   least a couple of data points before we start comparing predictions.
+1. **Warmup-aware scoring** — if an arm has fewer than 2 pulls, it receives a
+   very high score so it is likely to enter the greedy slate early.
 
-2. **Explore (10%)** — with probability ε = 0.10, pick a completely random arm.
-   This ensures we keep discovering if an arm has improved or if a previously
-   bad arm works well for a new visitor type.
+2. **Exploit slate build** — sort arms by predicted score and greedily add arms
+   until K=3, skipping any arm that conflicts with already-chosen arms.
 
-3. **Exploit (90%)** — compute the predicted reward for every active arm using
-   the visitor's feature vector, and pick the one with the highest prediction.
+3. **Explore (10%)** — with probability ε = 0.10, replace one random slot in
+   the current slate with a random valid non-conflicting arm.
+
+4. **Fallback** — if not enough valid arms exist after conflict filtering,
+   return fewer than K arms (first visit still uses control/no-change).
 
 ### Why epsilon-greedy?
 
-It's the simplest effective exploration strategy. More sophisticated approaches
-(UCB confidence bounds, Thompson sampling) exist but epsilon-greedy is easy to
-understand, implement, and explain in a report — and it works well in practice.
+It keeps exploration simple and stable while supporting a combinational slate:
+you mostly serve the best-known compatible set, but still inject randomness in
+one slot to keep learning.
+
+---
+
+## Slate Conflict Rules
+
+The combinational layer prevents incompatible arm combinations.
+
+Two arms conflict if any of these are true:
+
+1. Same arm (duplicate).
+2. Both set the same key in page_config.variants.
+3. Both define non-null promote (only one promote action per slate).
+4. One hides a section that the other compacts, variants, or promotes.
+
+These checks are implemented by _has_conflict and _conflicts_with_slate.
+
+---
+
+## Merging Multiple Arms Into One page_config
+
+After selecting a slate, arm configs are merged deterministically:
+
+1. compact: union of all compact lists.
+2. hide: union of all hide lists.
+3. promote: first non-null promote value (conflicts already prevent multiples).
+4. variants: merged dictionary (conflicts already prevent same-key collisions).
+
+For deterministic output, compact and hide are converted to sorted lists before
+returning JSON to the frontend.
 
 ---
 
 ## Reward Signal
 
-Currently binary:
+Currently binary (full-bandit reward at session level):
 
 | Condition | Reward |
 |---|---|
 | `session.cta_clicked == True` | `1.0` |
 | `session.cta_clicked == False` | `0.0` |
 
-Rewards are only recorded for sessions where the bandit ran (`visit_number >= 2`).
+Rewards are only recorded for sessions where the bandit ran (visit_number >= 2).
+
+### Observation-gated per-arm updates
+
+Although reward is one scalar per session, each chosen arm is updated only if
+the user observed at least one section affected by that arm.
+
+Observed section definition:
+
+- There exists Event with event_type in {section_view, section_dwell}
+- and Event.section equals a section in arm.affected_sections.
+
+This avoids rewarding arms for sections never seen by the user.
 
 ---
 
@@ -228,6 +279,7 @@ Rewards are only recorded for sessions where the bandit ran (`visit_number >= 2`
 | `name` | `CharField` | Optional human label |
 | `page_config` | `JSONField` | Config dict for `applyPageConfig()` (see shape below) |
 | `is_active` | `BooleanField` | Inactive arms are excluded from selection |
+| `affected_sections` | `JSONField` | Sections the arm modifies, used for observation-gated updates |
 | `created_at` | `DateTimeField` | Auto-set on creation |
 
 ### `BanditDecision`
@@ -240,10 +292,13 @@ One row per session where the bandit ran (visit ≥ 2).
 | `visitor` | `ForeignKey → Visitor` | The visitor |
 | `context_json` | `JSONField` | Human-readable context snapshot |
 | `context_vector` | `JSONField` | The 8-number feature vector used for prediction |
-| `arm` | `ForeignKey → BanditArm` | The chosen arm |
+| `arm` | `ForeignKey → BanditArm (nullable)` | Legacy single-arm field |
+| `chosen_arm_ids` | `JSONField` | List of arm_id strings in the chosen slate |
+| `merged_page_config` | `JSONField` | Final merged config sent to frontend |
 | `explore` | `BooleanField` | `True` if random/warmup pick |
 | `epsilon` | `FloatField` | Epsilon at decision time |
 | `reward` | `FloatField(nullable)` | Filled when session ends (1.0 or 0.0) |
+| `updated_arm_ids` | `JSONField` | Arms actually updated after observation gating |
 | `created_at` | `DateTimeField` | Auto-set |
 
 ### `LinUCBParam`
@@ -305,8 +360,10 @@ follows the shape consumed by the frontend's `applyPageConfig()`:
 | | `promote_testimonials` | Move testimonials right below trust bar |
 | | `promote_contact` | Move contact right below trust bar |
 
-With `MIN_PULLS_PER_ARM = 2`, warmup requires 46 visits (2 × 23 arms), after
-which the model starts exploiting what it has learned.
+With `MIN_PULLS_PER_ARM = 2`, warmup pressure is spread across early visits.
+Because each returning visit can update multiple arms from the chosen slate,
+coverage is typically reached much faster than a strict one-arm-per-visit
+system.
 
 ---
 
@@ -325,19 +382,30 @@ Extracts the 8-number feature vector from the visitor and request:
 
 Also returns a human-readable `context_dict` for logging.
 
-### `choose_arm(feature_vector, epsilon=0.10) → (arm, explore_flag)`
+### `choose_slate(feature_vector, k=3, epsilon=0.10) → (chosen_arms, explore_flag, predicted_scores)`
 
-Epsilon-greedy selection:
+Epsilon-greedy combinational selection:
 
-1. Warmup → forced exploration of under-pulled arms
-2. ε probability → random arm
-3. Otherwise → arm with highest `predicted_reward = dot(features, weights)`
+1. Score all active arms (excluding no_change) using the linear model
+2. Greedily build up to K non-conflicting arms
+3. With probability ε, replace one random slot with a random valid arm
+4. Return chosen arms, explore flag, and per-arm predicted scores
 
-Auto-creates `LinUCBParam` rows for any arm missing one.
+Auto-creates LinUCBParam rows for any arm missing one.
+
+### `merge_page_configs(arms) → merged_config`
+
+Merges compact/hide/promote/variants across chosen arms into one deterministic
+frontend payload.
+
+### `_has_conflict(arm_a, arm_b)` and `_conflicts_with_slate(arm, slate)`
+
+Conflict guards used during greedy slate construction.
 
 ### `update_stats(arm, feature_vector, reward)`
 
-Called when a session ends. Updates the chosen arm's `LinUCBParam`:
+Called when a session ends. Updates one arm's LinUCBParam (used for each
+eligible arm in the chosen slate):
 
 ```python
 x = np.array(feature_vector)
@@ -376,7 +444,7 @@ Computes `weights = np.linalg.solve(A, b)` then `return weights @ x`.
 
 ## Frontend Integration
 
-The `/accept-cookies/` response includes:
+The /accept-cookies/ response includes:
 
 ```json
 {
@@ -384,12 +452,16 @@ The `/accept-cookies/` response includes:
   "visitor_id": "...",
   "is_new": false,
   "visit_number": 3,
-  "arm_id": "highlight_plan_2",
+   "chosen_arms": ["highlight_plan_2", "testimonials_single", "faq_compact"],
+   "explore": false,
   "page_config": {
-    "compact": [],
+      "compact": ["faq"],
     "hide": [],
     "promote": null,
-    "variants": { "pricing": "highlight-plan-2" }
+      "variants": {
+         "pricing": "highlight-plan-2",
+         "testimonials": "testimonials-single"
+      }
   }
 }
 ```
@@ -413,6 +485,9 @@ python manage.py seed_bandit_arms          # insert new arms (skip existing)
 python manage.py seed_bandit_arms --reset  # delete all arms first, then insert
 ```
 
+The command also derives and backfills BanditArm.affected_sections from each
+arm's page_config (compact/hide/promote/variants).
+
 ---
 
 ## File Map
@@ -420,7 +495,7 @@ python manage.py seed_bandit_arms --reset  # delete all arms first, then insert
 | File | Contents |
 |---|---|
 | `landing/models.py` | `BanditArm`, `BanditDecision`, `LinUCBParam` + `Session.visit_number` |
-| `landing/bandit_utils.py` | `build_context`, `choose_arm`, `update_stats`, `_predict`, numpy helpers |
+| `landing/bandit_utils.py` | `build_context`, `choose_slate`, conflict checks, `merge_page_configs`, `update_stats`, `_predict` |
 | `landing/views.py` | Bandit logic in `accept_cookies` and `end_session` views |
 | `landing/admin.py` | Admin classes for all bandit models |
 | `landing/management/commands/seed_bandit_arms.py` | Seed command for starter arms |

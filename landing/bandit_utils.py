@@ -1,9 +1,11 @@
 """
-Bandit utility functions — Linear contextual bandit with ε-greedy exploration.
+Bandit utility functions — Combinational Contextual Multi-Armed Bandit.
 
-build_context    – turn a visitor into a list of 8 numbers (the feature vector)
-choose_arm       – predict which arm will work best, with ε-greedy exploration
-update_stats     – learn from the result of a session (adjust weights)
+build_context      – turn a visitor into a list of 8 numbers (the feature vector)
+choose_arm         – (legacy) single-arm ε-greedy selection
+choose_slate       – pick K non-conflicting arms per visit (slate bandit)
+merge_page_configs – combine page_config dicts from a slate into one
+update_stats       – learn from the result of a session (adjust weights)
 
 How it works (plain English)
 ----------------------------
@@ -17,13 +19,13 @@ weight and add them up:
 
     predicted_reward = sum(feature_i × weight_i  for each feature)
 
-The arm with the highest predicted reward wins (90% of the time).
-The other 10% we pick a random arm to keep exploring (ε-greedy).
+For returning visitors (visit_number >= 2) the bandit picks a SLATE of
+K=3 non-conflicting arms, merges their page_configs, and sends the
+combined config to the frontend.
 
-When the session ends and we know if the visitor clicked a CTA
-(reward = 1.0) or not (reward = 0.0), we update the arm's stored
-parameters (A_matrix and b_vector in LinUCBParam) so the weights
-become more accurate for similar visitors in the future.
+At session end the reward (CTA clicked = 1, else 0) is applied only to
+arms whose affected sections were actually *observed* by the user
+(section_view / section_dwell events).
 
 Feature vector (d=8)
 --------------------
@@ -291,3 +293,193 @@ def update_stats(arm, feature_vector, reward):
         "Bandit update: arm=%s reward=%.1f n=%d",
         arm.arm_id, reward, param.n,
     )
+
+
+# ---------------------------------------------------------------------------
+# 4) Conflict detection for slate selection
+# ---------------------------------------------------------------------------
+
+def _has_conflict(arm_a, arm_b):
+    """
+    Check whether two arms conflict and cannot coexist in the same slate.
+
+    Conflict rules
+    --------------
+    1. Same arm (duplicate).
+    2. Both set the same key in page_config.variants.
+    3. Both have a non-null ``promote`` (only one layout reorder per slate).
+    4. One hides a section that the other highlights / compacts / promotes.
+    """
+    if arm_a.pk == arm_b.pk:
+        return True
+
+    cfg_a = arm_a.page_config or {}
+    cfg_b = arm_b.page_config or {}
+
+    # Rule 2: overlapping variants keys
+    vars_a = set(cfg_a.get("variants", {}).keys())
+    vars_b = set(cfg_b.get("variants", {}).keys())
+    if vars_a & vars_b:
+        return True
+
+    # Rule 3: only one promote per slate
+    promote_a = cfg_a.get("promote")
+    promote_b = cfg_b.get("promote")
+    if promote_a and promote_b:
+        return True
+
+    # Rule 4: hide conflicts with compact / variant / promote on the same section
+    hide_a = set(cfg_a.get("hide", []))
+    hide_b = set(cfg_b.get("hide", []))
+
+    active_a = set(cfg_a.get("compact", [])) | vars_a
+    if promote_a:
+        active_a.add(promote_a)
+
+    active_b = set(cfg_b.get("compact", [])) | vars_b
+    if promote_b:
+        active_b.add(promote_b)
+
+    if hide_a & active_b or hide_b & active_a:
+        return True
+
+    return False
+
+
+def _conflicts_with_slate(arm, slate):
+    """Return True if *arm* conflicts with any arm already in *slate*."""
+    return any(_has_conflict(arm, chosen) for chosen in slate)
+
+
+# ---------------------------------------------------------------------------
+# 5) Merge page_configs for a slate of arms
+# ---------------------------------------------------------------------------
+
+def merge_page_configs(arms):
+    """
+    Merge page_config dicts from multiple arms into one deterministic config.
+
+    compact  → union of all compact section lists (sorted)
+    hide     → union of all hidden section lists (sorted)
+    promote  → first non-null promote value
+    variants → merged dict (conflicts already prevented by choose_slate)
+    """
+    merged = {
+        "compact": set(),
+        "hide": set(),
+        "promote": None,
+        "variants": {},
+    }
+
+    for arm in arms:
+        cfg = arm.page_config or {}
+        merged["compact"] |= set(cfg.get("compact", []))
+        merged["hide"] |= set(cfg.get("hide", []))
+        if cfg.get("promote") and not merged["promote"]:
+            merged["promote"] = cfg["promote"]
+        merged["variants"].update(cfg.get("variants", {}))
+
+    # Convert sets to sorted lists for deterministic JSON output
+    merged["compact"] = sorted(merged["compact"])
+    merged["hide"] = sorted(merged["hide"])
+
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# 6) choose_slate — combinational contextual multi-armed bandit
+# ---------------------------------------------------------------------------
+
+SLATE_K = 3   # number of arms per slate
+
+
+def choose_slate(feature_vector, k=SLATE_K, epsilon=EPSILON):
+    """
+    Choose a slate of K non-conflicting arms using ε-greedy exploration.
+
+    Algorithm
+    ---------
+    1. Score every active arm via the linear model (w · x).
+       Under-pulled arms (n < MIN_PULLS_PER_ARM) get +inf for warmup.
+    2. Greedily pick top-K non-conflicting arms (``no_change`` excluded).
+    3. With probability ε, replace ONE random slot with a random valid arm.
+    4. If fewer than K valid arms exist, return a shorter slate.
+
+    Returns
+    -------
+    chosen : list[BanditArm]
+    explored : bool
+    predicted_scores : dict[str, float]   arm_id → predicted reward
+    """
+    arms = list(BanditArm.objects.filter(is_active=True))
+    if not arms:
+        raise ValueError("No active BanditArm rows — run seed_bandit_arms first.")
+
+    # Ensure every arm has LinUCB parameters
+    params = {}
+    for arm in arms:
+        param, _ = LinUCBParam.objects.get_or_create(
+            arm=arm,
+            defaults={
+                "A_matrix": make_initial_A(),
+                "b_vector": make_initial_b(),
+            },
+        )
+        params[arm.pk] = param
+
+    # Score arms — under-pulled get +inf (forced warmup)
+    arm_scores = []
+    for arm in arms:
+        if arm.arm_id == "no_change":
+            continue  # exclude control from slate
+        p = params[arm.pk]
+        score = (
+            float("inf")
+            if p.n < MIN_PULLS_PER_ARM
+            else _predict(p.A_matrix, p.b_vector, feature_vector)
+        )
+        arm_scores.append((arm, score))
+
+    # Sort descending by predicted score
+    arm_scores.sort(key=lambda pair: pair[1], reverse=True)
+
+    # --- greedy selection of top-K non-conflicting arms --------------------
+    chosen = []
+    for arm, _score in arm_scores:
+        if len(chosen) >= k:
+            break
+        if not _conflicts_with_slate(arm, chosen):
+            chosen.append(arm)
+
+    # --- ε-greedy exploration: swap one slot with a random valid arm -------
+    explored = False
+    if chosen and random.random() < epsilon:
+        explored = True
+        slot = random.randint(0, len(chosen) - 1)
+        rest = chosen[:slot] + chosen[slot + 1:]
+        candidates = [
+            a for a in arms
+            if a.arm_id != "no_change"
+            and a not in rest
+            and not _conflicts_with_slate(a, rest)
+        ]
+        if candidates:
+            replacement = random.choice(candidates)
+            chosen = rest[:slot] + [replacement] + rest[slot:]
+
+    # --- predicted scores for logging / debugging --------------------------
+    predicted_scores = {}
+    for arm in chosen:
+        p = params[arm.pk]
+        if p.n >= MIN_PULLS_PER_ARM:
+            predicted_scores[arm.arm_id] = _predict(
+                p.A_matrix, p.b_vector, feature_vector,
+            )
+
+    logger.info(
+        "Bandit slate: arms=%s explore=%s",
+        [a.arm_id for a in chosen],
+        explored,
+    )
+
+    return chosen, explored, predicted_scores

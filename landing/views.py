@@ -39,7 +39,7 @@ from .ai_llm import generate_llm_recommendations
 from django.core.exceptions import ValidationError
 
 from .models import BanditArm, BanditDecision
-from .bandit_utils import build_context, choose_arm, update_stats
+from .bandit_utils import build_context, choose_arm, choose_slate, merge_page_configs, update_stats
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +352,7 @@ def end_session(request):
     session.max_scroll_pct = scores["max_scroll_pct"]
     session.engaged_time_ms = scores["engaged_time_ms"]
     session.cta_clicked = scores["cta_clicked"]
+    session.pricing_cta_clicked = scores["pricing_cta_clicked"]
     session.price_intent_score = scores["price_intent_score"]
     session.service_intent_score = scores["service_intent_score"]
     session.trust_intent_score = scores["trust_intent_score"]
@@ -365,15 +366,62 @@ def end_session(request):
     # --- bandit reward update (only for visit_number >= 2) -----------------
     if session.visit_number >= 2:
         try:
-            decision = BanditDecision.objects.select_related("arm").get(session=session)
-            reward = 1.0 if session.cta_clicked else 0.0
-            decision.reward = reward
-            decision.save(update_fields=["reward"])
-            update_stats(decision.arm, decision.context_vector, reward)
-            logger.info(
-                "Bandit reward: session=%s arm=%s reward=%.1f",
-                session.session_id, decision.arm.arm_id, reward,
-            )
+            decision = BanditDecision.objects.get(session=session)
+
+            if decision.reward is not None:
+                # Already processed — idempotent guard
+                logger.debug(
+                    "Bandit decision already rewarded for session %s",
+                    session.session_id,
+                )
+            else:
+                # Tiered reward:
+                #   1.0 – clicked a pricing-plan CTA (full conversion intent)
+                #   0.5 – clicked any other CTA (navigated toward pricing)
+                #   0.0 – no CTA interaction
+                if session.pricing_cta_clicked:
+                    reward = 1.0
+                elif session.cta_clicked:
+                    reward = 0.5
+                else:
+                    reward = 0.0
+
+                # Determine which sections the visitor actually saw
+                observed_sections = set(
+                    Event.objects.filter(
+                        session=session,
+                        event_type__in=["section_view", "section_dwell"],
+                    )
+                    .exclude(section="")
+                    .values_list("section", flat=True)
+                    .distinct()
+                )
+
+                # Update each arm in the slate IF its sections were observed
+                updated_ids = []
+                for arm_id in (decision.chosen_arm_ids or []):
+                    try:
+                        arm = BanditArm.objects.get(arm_id=arm_id)
+                    except BanditArm.DoesNotExist:
+                        continue
+                    arm_sections = set(arm.affected_sections or [])
+                    # Empty affected_sections → always update (arm changes nothing section-specific)
+                    if not arm_sections or (arm_sections & observed_sections):
+                        update_stats(arm, decision.context_vector, reward)
+                        updated_ids.append(arm_id)
+                    else:
+                        logger.debug(
+                            "Skipping unobserved arm=%s (needs %s, saw %s)",
+                            arm_id, arm_sections, observed_sections,
+                        )
+
+                decision.reward = reward
+                decision.updated_arm_ids = updated_ids
+                decision.save(update_fields=["reward", "updated_arm_ids"])
+                logger.info(
+                    "Bandit reward: session=%s reward=%.1f updated=%s",
+                    session.session_id, reward, updated_ids,
+                )
         except BanditDecision.DoesNotExist:
             logger.debug("No BanditDecision for session %s — skipping reward.", session.session_id)
         except Exception:
@@ -462,14 +510,18 @@ def accept_cookies(request):
         visitor.cookie_id, session.session_id, is_new, visit_number,
     )
 
-    # --- contextual bandit -------------------------------------------------
+    # --- contextual bandit (slate) -----------------------------------------
     page_config = {}   # default: no layout changes (control)
-    arm_id = None
+    chosen_arm_ids = []
+    explored = False
 
     if visit_number >= 2:
         try:
             context_dict, feature_vector = build_context(visitor, request)
-            arm, explored, predicted_score = choose_arm(feature_vector)
+            chosen_arms, explored, predicted_scores = choose_slate(feature_vector)
+
+            chosen_arm_ids = [a.arm_id for a in chosen_arms]
+            page_config = merge_page_configs(chosen_arms)
 
             from .bandit_utils import EPSILON as _eps
             BanditDecision.objects.create(
@@ -477,17 +529,15 @@ def accept_cookies(request):
                 visitor=visitor,
                 context_json=context_dict,
                 context_vector=feature_vector,
-                arm=arm,
+                chosen_arm_ids=chosen_arm_ids,
+                merged_page_config=page_config,
                 explore=explored,
                 epsilon=_eps,
-                predicted_score=predicted_score,
             )
 
-            page_config = arm.page_config or {}
-            arm_id = arm.arm_id
             logger.info(
-                "Bandit chose arm=%s (explore=%s)",
-                arm.arm_id, explored,
+                "Bandit slate: arms=%s (explore=%s)",
+                chosen_arm_ids, explored,
             )
         except Exception:
             logger.exception("Bandit decision failed — falling back to control.")
@@ -499,8 +549,9 @@ def accept_cookies(request):
         "visitor_id": str(visitor.cookie_id),
         "is_new": is_new,
         "visit_number": visit_number,
-        "arm_id": arm_id,
+        "chosen_arms": chosen_arm_ids,
         "page_config": page_config,
+        "explore": explored,
     })
 
     # Persist visitor_id cookie for 1 year

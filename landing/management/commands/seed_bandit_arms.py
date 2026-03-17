@@ -16,6 +16,20 @@ from landing.models import BanditArm, LinUCBParam
 from landing.bandit_utils import make_initial_A, make_initial_b
 
 
+def _derive_affected_sections(page_config):
+    """Derive the list of section IDs a page_config touches."""
+    sections = set()
+    for s in page_config.get("compact", []):
+        sections.add(s)
+    for s in page_config.get("hide", []):
+        sections.add(s)
+    if page_config.get("promote"):
+        sections.add(page_config["promote"])
+    for s in page_config.get("variants", {}):
+        sections.add(s)
+    return sorted(sections)
+
+
 # Each arm's page_config follows the applyPageConfig shape:
 #   { compact: [...], hide: [...], promote: "section_id", variants: {id: cls} }
 
@@ -305,17 +319,23 @@ class Command(BaseCommand):
 
         created_count = 0
         for arm_data in STARTER_ARMS:
+            affected = _derive_affected_sections(arm_data["page_config"])
             _obj, created = BanditArm.objects.get_or_create(
                 arm_id=arm_data["arm_id"],
                 defaults={
                     "name": arm_data["name"],
                     "page_config": arm_data["page_config"],
+                    "affected_sections": affected,
                 },
             )
             if created:
                 created_count += 1
                 self.stdout.write(self.style.SUCCESS(f"  Created arm: {arm_data['arm_id']}"))
             else:
+                # Backfill affected_sections for existing arms that lack it
+                if not _obj.affected_sections:
+                    _obj.affected_sections = affected
+                    _obj.save(update_fields=["affected_sections"])
                 self.stdout.write(f"  Already exists: {arm_data['arm_id']}")
 
         # Ensure every arm has a LinUCBParam row (linear bandit parameters)

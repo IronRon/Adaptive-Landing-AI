@@ -122,6 +122,10 @@ class Session(models.Model):
         default=False,
         help_text="True if the visitor clicked any CTA element.",
     )
+    pricing_cta_clicked = models.BooleanField(
+        default=False,
+        help_text="True if the visitor clicked a CTA within the pricing section (plan purchase intent).",
+    )
     conversion = models.BooleanField(
         default=False,
         help_text="Placeholder for future conversion tracking.",
@@ -308,6 +312,11 @@ class BanditArm(models.Model):
         default=True,
         help_text="Inactive arms are excluded from selection.",
     )
+    affected_sections = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Section IDs this arm modifies, e.g. ["pricing"]. Used for observation-gated reward.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -356,6 +365,9 @@ class BanditDecision(models.Model):
         BanditArm,
         on_delete=models.CASCADE,
         related_name="decisions",
+        null=True,
+        blank=True,
+        help_text="Legacy single-arm FK (nullable for slate decisions).",
     )
     explore = models.BooleanField(
         help_text="True if this was an exploration pick (random).",
@@ -366,12 +378,27 @@ class BanditDecision(models.Model):
     reward = models.FloatField(
         null=True,
         blank=True,
-        help_text="Filled in when the session ends (1.0 if CTA clicked, else 0.0).",
+        help_text="Filled in when the session ends (1.0 if pricing-plan CTA clicked, 0.5 if any other CTA clicked, else 0.0).",
     )
     predicted_score = models.FloatField(
         null=True,
         blank=True,
         help_text="The model's predicted reward for the chosen arm at decision time.",
+    )
+    chosen_arm_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of arm_id strings in the chosen slate.',
+    )
+    merged_page_config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Merged page_config applied to the frontend for this slate.',
+    )
+    updated_arm_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Arm IDs that were actually updated with reward (observation-gated).',
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -382,7 +409,8 @@ class BanditDecision(models.Model):
         ]
 
     def __str__(self):
-        return f"Decision session={self.session_id} arm={self.arm.arm_id}"
+        arms = self.chosen_arm_ids or ([self.arm.arm_id] if self.arm_id else [])
+        return f"Decision session={self.session_id} arms={arms}"
 
 
 class BanditArmStat(models.Model):
