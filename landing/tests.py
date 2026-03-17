@@ -141,8 +141,9 @@ def _dummy_feature_vector():
 # Tests
 # ---------------------------------------------------------------------------
 
+# Unit Tests for the core bandit logic: conflict detection, merging configs, and slate selection.
 class ConflictDetectionTests(TestCase):
-    """Test _has_conflict between pairs of arms."""
+    """Test _has_conflict() between pairs of arms."""
 
     def setUp(self):
         _seed_arms()
@@ -191,7 +192,7 @@ class ConflictDetectionTests(TestCase):
 
 
 class MergePageConfigTests(TestCase):
-    """Test merge_page_configs produces correct, deterministic output."""
+    """Test merge_page_configs() produces correct, deterministic output."""
 
     def setUp(self):
         _seed_arms()
@@ -224,7 +225,7 @@ class MergePageConfigTests(TestCase):
 
 
 class ChooseSlateTests(TestCase):
-    """Test choose_slate returns valid, conflict-free slates."""
+    """Test choose_slate() returns valid, conflict-free slates."""
 
     def setUp(self):
         _seed_arms()
@@ -269,7 +270,7 @@ class ChooseSlateTests(TestCase):
             for j in range(i + 1, len(chosen)):
                 self.assertFalse(_has_conflict(chosen[i], chosen[j]))
 
-
+# Integration Tests for the full flow of accepting cookies, making decisions, and ending sessions with rewards.
 class FirstVisitNoDecisionTests(TestCase):
     """First visit (visit_number == 1) must not create a BanditDecision."""
 

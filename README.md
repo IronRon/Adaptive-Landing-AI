@@ -17,15 +17,16 @@ section visibility, compactness, and variant styling to maximise conversions.
 ## Table of Contents
 
 1. [Project Goal](#project-goal)
-2. [Architecture Overview](#architecture-overview)
-3. [Tech Stack](#tech-stack)
-4. [What Has Been Implemented](#what-has-been-implemented)
-5. [What Is Next](#what-is-next)
-6. [Project Structure](#project-structure)
-7. [Database Schema](#database-schema)
-8. [Data Flow](#data-flow)
-9. [Setup & Running](#setup--running)
-10. [Legacy / Prototype Code](#legacy--prototype-code)
+2. [Before vs After (Screenshots)](#before-vs-after-screenshots)
+3. [Architecture Overview](#architecture-overview)
+4. [Tech Stack](#tech-stack)
+5. [What Has Been Implemented](#what-has-been-implemented)
+6. [What Is Next](#what-is-next)
+7. [Project Structure](#project-structure)
+8. [Database Schema](#database-schema)
+9. [Data Flow](#data-flow)
+10. [Setup & Running](#setup--running)
+11. [Legacy / Prototype Code](#legacy--prototype-code)
 
 ---
 
@@ -44,6 +45,18 @@ with a **contextual multi-armed bandit** that:
 The landing page used as the test case is a fictional car-wash membership site
 (**SparkleWash**) with 11 sections (header, hero, trust bar, services, pricing,
 testimonials, about, locations, FAQ, contact, footer).
+
+---
+
+## Before vs After (Screenshots)
+
+The images below show a default page state and an adapted state after applying
+bandit-style UI changes (section promotion, testimonial variant, service
+emphasis).
+
+| Before (Default) | After (Adapted) | After (Alternative Adapted Variant) |
+|---|---|---|
+| ![Before - Default landing page](127.0.0.1_8000_demo_Default.png) | ![After - Adapted landing page](127.0.0.1_8000_demo_change%20(1).png) | ![After - Alternative adapted landing page](127.0.0.1_8000_demo_%20change(2).png) |
 
 ---
 
