@@ -27,6 +27,7 @@ section visibility, compactness, and variant styling to maximise conversions.
 9. [Data Flow](#data-flow)
 10. [Setup & Running](#setup--running)
 11. [Legacy / Prototype Code](#legacy--prototype-code)
+12. [Bandit Testing & Evaluation](#bandit-testing--evaluation)
 
 ---
 
@@ -296,6 +297,25 @@ The bandit runs for returning visitors (visit ≥ 2). First visits remain contro
   reward, and updated_arm_ids for debugging and idempotent processing.
 
 Full details: [BANDIT.md](BANDIT.md)
+
+### Bandit Testing & Evaluation (Simulator)
+
+The project includes a simulation command for algorithm testing using your real
+DB arms and real bandit selection/update functions.
+
+- **Command:** `python manage.py simulate_bandit --rounds 20000 --k 3 --epsilon 0.1 --seed 42`
+- **Bandit path:** uses real `choose_slate(...)` and (unless `--dry-run`) real
+  `update_stats(...)` so LinUCB DB params are actually updated.
+- **Baselines:** evaluates a conflict-safe random slate and a no-change policy
+  on the same synthetic contexts (no baseline learning updates).
+- **Outputs:** round-level CSV + cumulative/moving-average PNG learning curves
+  + summary CTR by policy/persona/device.
+
+Use `--reset-params` to start from a clean model state and `--dry-run` for
+evaluation-only runs.
+
+For full simulator details (personas, reward model, baselines, metrics,
+calibration tips), see [Simulator.md](Simulator.md).
 
 ### Django Admin
 
