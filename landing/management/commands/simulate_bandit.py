@@ -10,6 +10,7 @@ Example:
 
 from __future__ import annotations
 
+import json
 import random
 from pathlib import Path
 
@@ -267,3 +268,19 @@ class Command(BaseCommand):
             for key in sorted(policy_stats.keys()):
                 if key.startswith("device:"):
                     self.stdout.write(f"    {key}: {policy_stats[key]:.4f}")
+
+        summary_path = output_dir / f"simulate_bandit_summary_seed{seed}_r{rounds}.json"
+        summary_payload = {
+            "config": {
+                "rounds": rounds,
+                "k": k,
+                "epsilon": epsilon,
+                "seed": seed,
+                "reset_params": bool(reset_params_flag),
+                "dry_run": bool(dry_run),
+                "ma_window": ma_window,
+            },
+            "summary": summary,
+        }
+        summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+        self.stdout.write(f"Summary JSON saved: {summary_path}")
