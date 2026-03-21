@@ -26,31 +26,31 @@ from .models import BanditArm, BanditArmStat, LinUCBParam
 
 # --- Simulator tuning constants ---------------------------------------------
 # Context generation
-CONTEXT_NOISE_STD = 0.08          # Typical 0.03-0.15; higher => more varied synthetic users.
-DEVICE_MOBILE_PROB = 0.5          # Typical 0.30-0.80; set to your real traffic mix.
-VISIT_COUNT_MIN = 1               # Typical 1-2; keep >=1 to avoid zero-visit edge cases.
-VISIT_COUNT_MAX = 10              # Typical 5-20; affects normalization scale only.
+CONTEXT_NOISE_STD = 0.10
+DEVICE_MOBILE_PROB = 0.50
+VISIT_COUNT_MIN = 1
+VISIT_COUNT_MAX = 5
 
 # Reward model
-EMPTY_SLATE_P_CLICK = 0.02        # Typical 0.005-0.05; low fallback when no arms are selected.
-BASE_P_CLICK = 0.05               # Typical 0.02-0.12; calibrate near real baseline CTR.
-PERSONA_MATCH_BONUS = 0.20        # Typical 0.05-0.30; lift for persona-topic match.
-PERSONA_MISMATCH_PENALTY = 0.05   # Typical 0.00-0.12; penalty when focus topic not matched.
-BALANCED_TOPIC_BONUS = 0.03       # Typical 0.01-0.06 per matched topic for balanced persona.
-BALANCED_TOPIC_BONUS_CAP = 3      # Typical 2-5; caps total balanced bonus.
-INTENT_CENTER = 0.5               # Typical 0.4-0.6; midpoint where intent effect is neutral.
-INTENT_WEIGHT = 0.10              # Typical 0.05-0.25; sensitivity to intent strength.
-MIN_P_CLICK = 0.01                # Typical 0.001-0.05; floor to avoid zero-probability paths.
-MAX_P_CLICK = 0.95                # Typical 0.80-0.99; cap to keep stochastic outcomes.
+EMPTY_SLATE_P_CLICK = 0.01
+BASE_P_CLICK = 0.06
+PERSONA_MATCH_BONUS = 0.10
+PERSONA_MISMATCH_PENALTY = 0.04
+BALANCED_TOPIC_BONUS = 0.015
+BALANCED_TOPIC_BONUS_CAP = 3
+INTENT_CENTER = 0.50
+INTENT_WEIGHT = 0.06
+MIN_P_CLICK = 0.005
+MAX_P_CLICK = 0.25
 
 
 PERSONA_SPECS = {
-    "price_focused": {"price": 0.85, "service": 0.35, "trust": 0.35, "location": 0.25, "contact": 0.45},
-    "trust_focused": {"price": 0.35, "service": 0.40, "trust": 0.85, "location": 0.30, "contact": 0.45},
-    "service_focused": {"price": 0.35, "service": 0.85, "trust": 0.40, "location": 0.30, "contact": 0.40},
-    "location_focused": {"price": 0.35, "service": 0.35, "trust": 0.40, "location": 0.85, "contact": 0.40},
-    "contact_focused": {"price": 0.30, "service": 0.35, "trust": 0.45, "location": 0.35, "contact": 0.85},
-    "balanced": {"price": 0.55, "service": 0.55, "trust": 0.55, "location": 0.55, "contact": 0.55},
+    "price_focused":    {"price": 0.70, "service": 0.40, "trust": 0.40, "location": 0.35, "contact": 0.45},
+    "trust_focused":    {"price": 0.40, "service": 0.40, "trust": 0.70, "location": 0.35, "contact": 0.45},
+    "service_focused":  {"price": 0.40, "service": 0.70, "trust": 0.40, "location": 0.35, "contact": 0.40},
+    "location_focused": {"price": 0.40, "service": 0.40, "trust": 0.40, "location": 0.70, "contact": 0.40},
+    "contact_focused":  {"price": 0.35, "service": 0.40, "trust": 0.45, "location": 0.40, "contact": 0.70},
+    "balanced":         {"price": 0.50, "service": 0.50, "trust": 0.50, "location": 0.50, "contact": 0.50},
 }
 
 
