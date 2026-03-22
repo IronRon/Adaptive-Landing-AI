@@ -1,6 +1,6 @@
 # Adaptive Landing Page AI
 
-![Project Poster](Poster.png)
+![Project Poster](Poster_small.png)
 
 A Django-based system that **personalises a landing page in real time** using a
 contextual multi-armed bandit algorithm. The system tracks every visitor
