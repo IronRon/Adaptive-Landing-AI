@@ -12,7 +12,20 @@ section visibility, compactness, and variant styling to maximise conversions.
 > functional. The model still uses per-arm linear ridge regression +
 > epsilon-greedy, but now chooses up to 3 compatible arms per returning visit,
 > merges their configs, and applies observation-gated reward updates.
-> See [BANDIT.md](BANDIT.md) for full details.
+> See [BANDIT.md](BANDIT.md), [Simulator.md](Simulator.md),
+> [testing.md](testing.md), and [results.md](test_output/results.md)
+> for full details.
+
+## Executive Summary
+
+Automated unit and integration tests indicate the core decision flow is stable,
+including conflict-safe slate selection, observation-gated updates, endpoint
+validation, and idempotent end-session handling. In 27 offline simulator runs
+(5000 rounds each), the bandit consistently outperformed random baselines with
+mean uplift of +30.2% (conservative), +38.7% (base), and +48.5% (optimistic),
+reaching +50.2% uplift in the best setting (optimistic, epsilon = 0.10). These
+results suggest strong personalization potential, while still requiring online
+holdout validation before making causal business-impact claims.
 
 ---
 
@@ -318,6 +331,34 @@ evaluation-only runs.
 
 For full simulator details (personas, reward model, baselines, metrics,
 calibration tips), see [Simulator.md](Simulator.md).
+
+#### Findings & What They Mean (V2)
+
+From automated testing, unit and integration flows pass for conflict handling,
+slate validity, endpoint validation, observation-gated updates, and
+end-session idempotency, which gives confidence that learning logic and API
+side effects behave as intended.
+
+Using 27 runs (3 scenarios × 3 epsilons × 3 seeds, 5000 rounds each), the
+offline simulator shows consistent gains over random and no-change baselines:
+
+- **Base scenario:** mean bandit CTR **0.0997** with **+38.7% uplift vs random**.
+- **Conservative scenario:** mean bandit CTR **0.0757** with **+30.2% uplift vs random**.
+- **Optimistic scenario:** mean bandit CTR **0.1380** with **+48.5% uplift vs random**.
+- **Best setting:** optimistic, ε = 0.10, mean CTR **0.1396** with **+50.2% uplift vs random**.
+
+Across scenario/epsilon combinations, results are stable across seeds (low CTR
+standard deviation in most groups), which suggests the policy improvement is
+not coming from one lucky run.
+
+In practical terms, these results indicate the contextual slate bandit is
+learning useful personalization signals and should outperform static layouts in
+production-like traffic. However, this is still an offline simulator with a
+heuristic reward model, so live A/B holdouts and longer online evaluation are
+still required before making strong causal business claims.
+
+For the full experiment tables and plots, see [testing.md](testing.md) and
+[results.md](test_output/results.md).
 
 ### Django Admin
 
