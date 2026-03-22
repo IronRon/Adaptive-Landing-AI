@@ -111,7 +111,7 @@ _INTENT_SECTIONS = {
 }
 
 
-def _score_intent_bucket(events, sections: list[str]) -> float:
+def _score_intent_group(events, sections: list[str]) -> float:
     """Compute a single intent score (0..1) for *sections* from *events*.
 
     Collects five signals, normalises each to 0..1, and returns their
@@ -190,7 +190,7 @@ def compute_session_intent_scores(session: Session) -> dict:
     # 1. Intent scores per bucket (price / service / trust)
     # ------------------------------------------------------------------
     intent_scores = {
-        name: _score_intent_bucket(events, sections)
+        name: _score_intent_group(events, sections)
         for name, sections in _INTENT_SECTIONS.items()
     }
 
