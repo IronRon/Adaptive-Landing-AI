@@ -1,0 +1,50 @@
+{
+  "config": {
+    "rounds": 5000,
+    "k": 3,
+    "epsilon": 0.05,
+    "warmup_pulls": 20,
+    "seed": 1,
+    "reset_params": true,
+    "dry_run": false,
+    "ma_window": 200
+  },
+  "summary": {
+    "bandit": {
+      "overall_ctr": 0.101,
+      "n": 5000.0,
+      "persona:balanced": 0.0630952380952381,
+      "persona:contact_focused": 0.0850546780072904,
+      "persona:location_focused": 0.11729141475211609,
+      "persona:price_focused": 0.1281725888324873,
+      "persona:service_focused": 0.1050767414403778,
+      "persona:trust_focused": 0.10857142857142857,
+      "device:desktop": 0.09747292418772563,
+      "device:mobile": 0.104507379337854
+    },
+    "no_change": {
+      "overall_ctr": 0.0348,
+      "n": 5000.0,
+      "persona:balanced": 0.06190476190476191,
+      "persona:contact_focused": 0.02551640340218712,
+      "persona:location_focused": 0.026602176541717048,
+      "persona:price_focused": 0.03553299492385787,
+      "persona:service_focused": 0.0295159386068477,
+      "persona:trust_focused": 0.029714285714285714,
+      "device:desktop": 0.029683112715603692,
+      "device:mobile": 0.03988831272437176
+    },
+    "random": {
+      "overall_ctr": 0.0684,
+      "n": 5000.0,
+      "persona:balanced": 0.06904761904761905,
+      "persona:contact_focused": 0.05103280680437424,
+      "persona:location_focused": 0.05199516324062878,
+      "persona:price_focused": 0.08248730964467005,
+      "persona:service_focused": 0.07083825265643448,
+      "persona:trust_focused": 0.08457142857142858,
+      "device:desktop": 0.07099879663056559,
+      "device:mobile": 0.06581571599521341
+    }
+  }
+}

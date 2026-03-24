@@ -17,7 +17,9 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from landing import bandit_utils
 from landing.bandit_utils import EPSILON as DEFAULT_EPSILON
+from landing.bandit_utils import MIN_PULLS_PER_ARM as DEFAULT_WARMUP_PULLS
 from landing.bandit_utils import choose_slate, update_stats
 from landing.models import BanditArm
 from landing.simulator import (
@@ -42,6 +44,12 @@ class Command(BaseCommand):
         parser.add_argument("--rounds", type=int, default=20000, help="Number of simulation rounds.")
         parser.add_argument("--k", type=int, default=3, help="Slate size (number of arms per round).")
         parser.add_argument("--epsilon", type=float, default=DEFAULT_EPSILON, help="Epsilon passed to choose_slate.")
+        parser.add_argument(
+            "--warmup-pulls",
+            type=int,
+            default=DEFAULT_WARMUP_PULLS,
+            help="Minimum pulls per arm before exploit scoring is trusted.",
+        )
         parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
         parser.add_argument(
             "--reset-params",
@@ -71,6 +79,7 @@ class Command(BaseCommand):
         rounds = options["rounds"]
         k = options["k"]
         epsilon = float(options["epsilon"])
+        warmup_pulls = int(options["warmup_pulls"])
         seed = options["seed"]
         reset_params_flag = options["reset_params"]
         dry_run = options["dry_run"]
@@ -80,8 +89,13 @@ class Command(BaseCommand):
             raise CommandError("--rounds must be > 0")
         if k <= 0:
             raise CommandError("--k must be > 0")
+        if warmup_pulls <= 0:
+            raise CommandError("--warmup-pulls must be > 0")
         if not (0.0 <= epsilon <= 1.0):
             raise CommandError("--epsilon must be in [0, 1]")
+
+        # Override warmup threshold for this simulation run only.
+        bandit_utils.MIN_PULLS_PER_ARM = warmup_pulls
 
         # --- 2) Seed randomness for reproducible experiments -----------------
         rng = random.Random(seed)
@@ -110,7 +124,8 @@ class Command(BaseCommand):
 
         self.stdout.write(
             f"Starting simulation: rounds={rounds}, k={k}, epsilon={epsilon:.3f}, "
-            f"seed={seed}, reset_params={reset_params_flag}, dry_run={dry_run}"
+            f"warmup_pulls={warmup_pulls}, seed={seed}, "
+            f"reset_params={reset_params_flag}, dry_run={dry_run}"
         )
 
         rows: list[SimRound] = []
@@ -275,6 +290,7 @@ class Command(BaseCommand):
                 "rounds": rounds,
                 "k": k,
                 "epsilon": epsilon,
+                "warmup_pulls": warmup_pulls,
                 "seed": seed,
                 "reset_params": bool(reset_params_flag),
                 "dry_run": bool(dry_run),
