@@ -131,7 +131,7 @@ pricing interest."
 
 ## The Linear Model (Ridge Regression)
 
-Each arm stores two things in its `LinUCBParam`:
+Each arm stores two things in its `LinearArmParam`:
 
 ### A_matrix — "What visitors this arm has seen"
 
@@ -301,7 +301,7 @@ One row per session where the bandit ran (visit ≥ 2).
 | `updated_arm_ids` | `JSONField` | Arms actually updated after observation gating |
 | `created_at` | `DateTimeField` | Auto-set |
 
-### `LinUCBParam`
+### `LinearArmParam`
 
 One row per arm — stores the learned model parameters.
 
@@ -391,7 +391,7 @@ Epsilon-greedy combinational selection:
 3. With probability ε, replace one random slot with a random valid arm
 4. Return chosen arms, explore flag, and per-arm predicted scores
 
-Auto-creates LinUCBParam rows for any arm missing one.
+Auto-creates LinearArmParam rows for any arm missing one.
 
 ### `merge_page_configs(arms) → merged_config`
 
@@ -404,7 +404,7 @@ Conflict guards used during greedy slate construction.
 
 ### `update_stats(arm, feature_vector, reward)`
 
-Called when a session ends. Updates one arm's LinUCBParam (used for each
+Called when a session ends. Updates one arm's LinearArmParam (used for each
 eligible arm in the chosen slate):
 
 ```python
@@ -494,7 +494,7 @@ arm's page_config (compact/hide/promote/variants).
 
 | File | Contents |
 |---|---|
-| `landing/models.py` | `BanditArm`, `BanditDecision`, `LinUCBParam` + `Session.visit_number` |
+| `landing/models.py` | `BanditArm`, `BanditDecision`, `LinearArmParam` + `Session.visit_number` |
 | `landing/bandit_utils.py` | `build_context`, `choose_slate`, conflict checks, `merge_page_configs`, `update_stats`, `_predict` |
 | `landing/views.py` | Bandit logic in `accept_cookies` and `end_session` views |
 | `landing/admin.py` | Admin classes for all bandit models |

@@ -107,7 +107,7 @@ emphasis).
 │    ├── Event         (every tracked interaction)        │
 │    ├── BanditArm     (page config + affected sections)  │
 │    ├── BanditDecision(1:1 with session, logs slate)     │
-│    └── LinUCBParam   (per-arm learned weights)          │
+│    └── LinearArmParam (per-arm learned weights)         │
 │                                                         │
 │  bandit_utils.py (context → score arms → choose slate)  │
 │  utils.py        (section scores + intent computation)  │
@@ -120,7 +120,7 @@ emphasis).
 │  landing_visitor  ──1:N──  landing_session               │
 │  landing_session  ──1:N──  landing_event                 │
 │  landing_session  ──1:1──  landing_banditdecision        │
-│  landing_banditarm ──1:1── landing_linucbparam           │
+│  landing_banditarm ──1:1── landing_lineararmparam        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -292,7 +292,7 @@ The bandit runs for returning visitors (visit ≥ 2). First visits remain contro
   vector**: `[is_mobile, price_score, service_score, trust_score,
   location_score, contact_score, visit_number_norm, bias]`. All values are
   continuous (0–1), nothing is thrown away into discrete buckets.
-- **Per-arm model** — each arm has its own `LinUCBParam` storing an 8×8
+- **Per-arm model** — each arm has its own `LinearArmParam` storing an 8×8
   `A_matrix` ("what visitors it has seen") and an 8-element `b_vector`
   ("what worked"). Weights are computed as `A⁻¹ × b` — i.e. "what worked"
   divided by "what I've seen".
@@ -320,7 +320,7 @@ DB arms and real bandit selection/update functions.
 
 - **Command:** `python manage.py simulate_bandit --rounds 20000 --k 3 --epsilon 0.1 --seed 42`
 - **Bandit path:** uses real `choose_slate(...)` and (unless `--dry-run`) real
-  `update_stats(...)` so LinUCB DB params are actually updated.
+  `update_stats(...)` so linear-model DB params are actually updated.
 - **Baselines:** evaluates a conflict-safe random slate and a no-change policy
   on the same synthetic contexts (no baseline learning updates).
 - **Outputs:** round-level CSV + cumulative/moving-average PNG learning curves
@@ -363,7 +363,7 @@ For the full experiment tables and plots, see [testing.md](testing.md) and
 ### Django Admin
 
 All models (`Visitor`, `Session`, `Event`, `BanditArm`, `BanditDecision`,
-`LinUCBParam`) are registered in the admin with appropriate `list_display`,
+`LinearArmParam`) are registered in the admin with appropriate `list_display`,
 `list_filter`, and `search_fields` for easy debugging and data inspection.
 
 ---
@@ -393,7 +393,7 @@ adaptive-landing-ai/
 │   ├── urls.py
 │   └── wsgi.py
 ├── landing/                    # Main application
-│   ├── models.py               # Visitor, Session, Event, BanditArm, BanditDecision, LinUCBParam
+│   ├── models.py               # Visitor, Session, Event, BanditArm, BanditDecision, LinearArmParam
 │   ├── views.py                # Endpoints + page views
 │   ├── urls.py                 # URL routing
 │   ├── admin.py                # Admin registrations
@@ -502,7 +502,7 @@ BanditDecision  (one per session where bandit ran)
   ├── updated_arm_ids    JSON[]     (arms updated after observation gating)
   └── created_at         datetime
 
-LinUCBParam  (one per arm — learned weights for linear model)
+LinearArmParam  (one per arm — learned weights for linear model)
   ├── arm             1:1 → BanditArm
   ├── A_matrix        JSON       (8×8 matrix — "what visitors this arm has seen")
   ├── b_vector        JSON       (8-element list — "what worked")

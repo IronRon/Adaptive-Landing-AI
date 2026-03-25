@@ -9,7 +9,7 @@ from .models import (
     Event,
     LandingPage,
     LandingSection,
-    LinUCBParam,
+    LinearArmParam,
     Session,
     Visitor,
 )
@@ -98,8 +98,8 @@ class LandingSectionAdmin(admin.ModelAdmin):
     list_display = ("key", "page", "order", "created_at")
 
 
-@admin.register(LinUCBParam)
-class LinUCBParamAdmin(admin.ModelAdmin):
+@admin.register(LinearArmParam)
+class LinearArmParamAdmin(admin.ModelAdmin):
     list_display = ("arm", "n", "updated_at")
     search_fields = ("arm__arm_id",)
     readonly_fields = ("updated_at",)

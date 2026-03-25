@@ -21,7 +21,7 @@ from .bandit_utils import (
     make_initial_A,
     make_initial_b,
 )
-from .models import BanditArm, BanditArmStat, LinUCBParam
+from .models import BanditArm, BanditArmStat, LinearArmParam
 
 
 # --- Simulator tuning constants ---------------------------------------------
@@ -225,11 +225,11 @@ def no_change_slate(arms: Sequence[BanditArm]) -> List[BanditArm]:
 
 def reset_bandit_params() -> None:
     """Reset learned model state in DB so simulation starts from scratch."""
-    LinUCBParam.objects.all().delete()
+    LinearArmParam.objects.all().delete()
     BanditArmStat.objects.all().delete()
 
     for arm in BanditArm.objects.filter(is_active=True):
-        LinUCBParam.objects.create(
+        LinearArmParam.objects.create(
             arm=arm,
             A_matrix=make_initial_A(),
             b_vector=make_initial_b(),

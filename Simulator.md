@@ -10,7 +10,7 @@ The simulator is an offline testing harness that lets you:
 - Generate synthetic visitor contexts.
 - Use **real DB arms** (`BanditArm`) for slate decisions.
 - Use your **real bandit selection** function (`choose_slate`).
-- Use your **real update path** (`update_stats`) to train LinUCB params in DB.
+- Use your **real update path** (`update_stats`) to train linear-model params in DB.
 - Compare against random and no-change baselines.
 - Export reproducible artifacts (CSV + plots + summary stats).
 
@@ -114,7 +114,7 @@ All constants are centralized in `landing/simulator.py` with tuning ranges.
 Training only occurs for bandit policy and only when not in dry-run:
 
 - Command calls real `update_stats(arm, feature_vector, reward)`.
-- `LinUCBParam` rows in DB are updated (A matrix, b vector, pull count).
+- `LinearArmParam` rows in DB are updated (A matrix, b vector, pull count).
 
 Baselines are evaluation-only and do not modify model parameters.
 

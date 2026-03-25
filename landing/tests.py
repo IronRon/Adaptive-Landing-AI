@@ -24,7 +24,7 @@ from landing.models import (
     BanditArm,
     BanditDecision,
     Event,
-    LinUCBParam,
+    LinearArmParam,
     Session,
     Visitor,
 )
@@ -117,7 +117,7 @@ def _seed_arms():
             page_config=d["page_config"],
             affected_sections=d["affected_sections"],
         )
-        LinUCBParam.objects.create(
+        LinearArmParam.objects.create(
             arm=arm,
             A_matrix=make_initial_A(),
             b_vector=make_initial_b(),
@@ -167,7 +167,7 @@ class ConflictDetectionTests(TestCase):
             page_config={"variants": {"pricing": "highlight-plan-3"}},
             affected_sections=["pricing"],
         )
-        LinUCBParam.objects.create(arm=c, A_matrix=make_initial_A(), b_vector=make_initial_b())
+        LinearArmParam.objects.create(arm=c, A_matrix=make_initial_A(), b_vector=make_initial_b())
         self.assertTrue(_has_conflict(b, c))
 
     def test_compact_no_variant_overlap_no_conflict(self):
@@ -373,7 +373,7 @@ class ObservationGatedRewardTests(TestCase):
         )
 
     def _get_n(self, arm_id):
-        return LinUCBParam.objects.get(arm__arm_id=arm_id).n
+        return LinearArmParam.objects.get(arm__arm_id=arm_id).n
 
     def test_unobserved_arm_not_updated(self):
         # Function under test: update_stats() (observation-gated reward path)
@@ -457,7 +457,7 @@ class IdempotencyTests(TestCase):
             section="hero", timestamp=now,
         )
 
-        n_before = LinUCBParam.objects.get(arm__arm_id="hero_compact").n
+        n_before = LinearArmParam.objects.get(arm__arm_id="hero_compact").n
 
         # End session payload
         payload = json.dumps({"session_id": str(self.session.session_id)})
@@ -473,7 +473,7 @@ class IdempotencyTests(TestCase):
         )
         self.assertEqual(resp1.status_code, 200)
 
-        n_after_first = LinUCBParam.objects.get(arm__arm_id="hero_compact").n
+        n_after_first = LinearArmParam.objects.get(arm__arm_id="hero_compact").n
         self.assertEqual(n_after_first, n_before + 1)
 
         # Second call â€” should be idempotent
@@ -484,7 +484,7 @@ class IdempotencyTests(TestCase):
         )
         self.assertEqual(resp2.status_code, 200)
 
-        n_after_second = LinUCBParam.objects.get(arm__arm_id="hero_compact").n
+        n_after_second = LinearArmParam.objects.get(arm__arm_id="hero_compact").n
         self.assertEqual(
             n_after_second, n_after_first,
             "Stats double-incremented on second end-session call!",
@@ -585,14 +585,14 @@ class ChooseArmTests(TestCase):
     def test_choose_arm_exploit_picks_highest_predicted(self):
         # Function under test: choose_arm()
         arm_best = BanditArm.objects.get(arm_id="hero_compact")
-        param_best = LinUCBParam.objects.get(arm=arm_best)
+        param_best = LinearArmParam.objects.get(arm=arm_best)
         param_best.A_matrix = make_initial_A()
         param_best.b_vector = [2.0] + [0.0] * (FEATURE_DIM - 1)
         param_best.n = MIN_PULLS_PER_ARM
         param_best.save()
 
         # Keep all other arms at zero prediction and warmup-complete.
-        LinUCBParam.objects.exclude(arm=arm_best).update(
+        LinearArmParam.objects.exclude(arm=arm_best).update(
             A_matrix=make_initial_A(),
             b_vector=make_initial_b(),
             n=MIN_PULLS_PER_ARM,
@@ -618,8 +618,8 @@ class ChooseArmTests(TestCase):
     def test_choose_arm_warmup_selects_under_pulled_arm(self):
         # Function under test: choose_arm()
         target = BanditArm.objects.get(arm_id="hero_compact")
-        LinUCBParam.objects.filter(arm=target).update(n=0)
-        LinUCBParam.objects.exclude(arm=target).update(n=MIN_PULLS_PER_ARM)
+        LinearArmParam.objects.filter(arm=target).update(n=0)
+        LinearArmParam.objects.exclude(arm=target).update(n=MIN_PULLS_PER_ARM)
 
         chosen, explored, predicted = choose_arm(_dummy_feature_vector(), epsilon=0.0)
         self.assertTrue(explored)

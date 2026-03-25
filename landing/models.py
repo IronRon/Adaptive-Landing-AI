@@ -418,7 +418,7 @@ class BanditArmStat(models.Model):
     Running statistics for a (context_bucket, arm) pair.
 
     DEPRECATED — kept for backward compatibility with existing data.
-    The linear bandit now uses LinUCBParam instead.
+    The linear bandit now uses LinearArmParam instead.
     """
 
     context_bucket = models.CharField(max_length=100, db_index=True)
@@ -456,7 +456,7 @@ class BanditArmStat(models.Model):
         return f"Stat bucket={self.context_bucket} arm={self.arm.arm_id} n={self.n} mean={self.mean_reward:.3f}"
 
 
-class LinUCBParam(models.Model):
+class LinearArmParam(models.Model):
     """
     Stored learning parameters for one bandit arm (linear contextual bandit).
 
@@ -488,7 +488,7 @@ class LinUCBParam(models.Model):
     arm = models.OneToOneField(
         BanditArm,
         on_delete=models.CASCADE,
-        related_name="linucb_param",
+        related_name="linear_param",
     )
     A_matrix = models.JSONField(
         help_text="8×8 grid tracking what visitors this arm has been shown to (feature combinations).",
@@ -503,8 +503,8 @@ class LinUCBParam(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "LinUCB Parameter"
-        verbose_name_plural = "LinUCB Parameters"
+        verbose_name = "Linear Arm Parameter"
+        verbose_name_plural = "Linear Arm Parameters"
 
     def __str__(self):
-        return f"LinUCB arm={self.arm.arm_id} n={self.n}"
+        return f"Linear arm={self.arm.arm_id} n={self.n}"

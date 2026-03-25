@@ -38,7 +38,7 @@ import random
 
 import numpy as np
 
-from .models import BanditArm, LinUCBParam, Session
+from .models import BanditArm, LinearArmParam, Session
 
 logger = logging.getLogger(__name__)
 
@@ -201,11 +201,11 @@ def choose_arm(feature_vector, epsilon=EPSILON):
     if not arms:
         raise ValueError("No active BanditArm rows — run seed_bandit_arms first.")
 
-    # Ensure every arm has a LinUCBParam row (auto-initialise if missing)
+    # Ensure every arm has a LinearArmParam row (auto-initialise if missing)
     params = {}
     under_pulled = []
     for arm in arms:
-        param, _created = LinUCBParam.objects.get_or_create(
+        param, _created = LinearArmParam.objects.get_or_create(
             arm=arm,
             defaults={
                 "A_matrix": make_initial_A(),
@@ -264,7 +264,7 @@ def update_stats(arm, feature_vector, reward):
     Next time we need weights:  weights = A_matrix⁻¹ × b_vector
     i.e. "what worked" divided by "what I've seen" = best prediction.
     """
-    param, _ = LinUCBParam.objects.get_or_create(
+    param, _ = LinearArmParam.objects.get_or_create(
         arm=arm,
         defaults={
             "A_matrix": make_initial_A(),
@@ -415,10 +415,10 @@ def choose_slate(feature_vector, k=SLATE_K, epsilon=EPSILON):
     if not arms:
         raise ValueError("No active BanditArm rows — run seed_bandit_arms first.")
 
-    # Ensure every arm has LinUCB parameters
+    # Ensure every arm has linear-model parameters
     params = {}
     for arm in arms:
-        param, _ = LinUCBParam.objects.get_or_create(
+        param, _ = LinearArmParam.objects.get_or_create(
             arm=arm,
             defaults={
                 "A_matrix": make_initial_A(),

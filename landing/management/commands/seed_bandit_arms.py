@@ -3,7 +3,7 @@ Management command: seed_bandit_arms
 
 Populates the BanditArm table with starter arms whose page_config
 matches the shape expected by the frontend's applyPageConfig() function.
-Also initialises LinUCBParam rows for each arm (linear bandit).
+Also initialises LinearArmParam rows for each arm (linear bandit).
 
 Usage:
     python manage.py seed_bandit_arms          # insert only new arms
@@ -12,7 +12,7 @@ Usage:
 
 from django.core.management.base import BaseCommand
 
-from landing.models import BanditArm, LinUCBParam
+from landing.models import BanditArm, LinearArmParam
 from landing.bandit_utils import make_initial_A, make_initial_b
 
 
@@ -338,10 +338,10 @@ class Command(BaseCommand):
                     _obj.save(update_fields=["affected_sections"])
                 self.stdout.write(f"  Already exists: {arm_data['arm_id']}")
 
-        # Ensure every arm has a LinUCBParam row (linear bandit parameters)
+        # Ensure every arm has a LinearArmParam row (linear bandit parameters)
         param_count = 0
         for arm in BanditArm.objects.all():
-            _param, p_created = LinUCBParam.objects.get_or_create(
+            _param, p_created = LinearArmParam.objects.get_or_create(
                 arm=arm,
                 defaults={
                     "A_matrix": make_initial_A(),
@@ -350,8 +350,8 @@ class Command(BaseCommand):
             )
             if p_created:
                 param_count += 1
-                self.stdout.write(self.style.SUCCESS(f"  Initialised LinUCB params: {arm.arm_id}"))
+                self.stdout.write(self.style.SUCCESS(f"  Initialised linear params: {arm.arm_id}"))
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nDone. {created_count} arm(s) created, {param_count} LinUCB param(s) initialised."
+            f"\nDone. {created_count} arm(s) created, {param_count} linear param(s) initialised."
         ))

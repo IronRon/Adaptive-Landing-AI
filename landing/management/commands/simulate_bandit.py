@@ -54,7 +54,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--reset-params",
             action="store_true",
-            help="Reset LinUCB and legacy bandit stats before simulation.",
+            help="Reset linear model and legacy bandit stats before simulation.",
         )
         parser.add_argument(
             "--dry-run",
